@@ -1,12 +1,8 @@
-"""
-Inference Script
-Evaluate trained models on test sets
-"""
-
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-import argparse
 import json
+from sklearn.metrics import (accuracy_score, precision_score,
+                                 recall_score, f1_score, confusion_matrix)
 
 import matplotlib
 matplotlib.use('Agg')
@@ -23,22 +19,12 @@ from utils import load_dataset, parse_arguments, CONFIG
 
 
 def load_model(model_path, config_path=None):
-    """
-    Load trained model from disk.
-    """
     if config_path is None:
         config_path = model_path.replace('.npy', '_config.json')
     return NeuralNetwork.load(model_path, config_path, CONFIG)
 
 
 def evaluate_model(model, X_test, y_onehot, batch_size=512):
-    """
-    Evaluate model on test data.
-
-    Returns Dictionary - logits, loss, accuracy, f1, precision, recall
-    """
-    from sklearn.metrics import (accuracy_score, precision_score,
-                                 recall_score, f1_score, confusion_matrix)
     n          = X_test.shape[0]
     all_logits = []
     all_probs  = []
@@ -65,16 +51,11 @@ def evaluate_model(model, X_test, y_onehot, batch_size=512):
 
 
 def main():
-    """
-    Main inference function.
-
-    Returns Dictionary - logits, loss, accuracy, f1, precision, recall
-    """
     args         = parse_arguments()
     weights_path = os.path.join(args.save_dir, args.model_save_path)
     config_path  = os.path.join(args.save_dir, args.config_path)
 
-    # ── W&B ───────────────────────────────────────────────────────────────────
+    #  W&B 
     use_wandb = (not args.no_wandb) and _WANDB_AVAILABLE
     wandb_run = None
     if use_wandb:
@@ -85,25 +66,25 @@ def main():
             config  = {'dataset': args.dataset, 'model_path': args.model_save_path},
         )
 
-    # ── Load model ────────────────────────────────────────────────────────────
+    #  Load model 
     model = load_model(weights_path, config_path)
 
-    # ── Load data ─────────────────────────────────────────────────────────────
+    #  Load data 
     (X_train, y_train), (X_test, y_test) = load_dataset(args.dataset)
 
-    # ── Train metrics ─────────────────────────────────────────────────────────
+    #  Train metrics 
     train_r = evaluate_model(model, X_train, y_train, args.batch_size)
-    print('\n── Train Set Metrics ─────────────────────')
+    print('\n Train Set Metrics ')
     for k in ('accuracy', 'precision', 'recall', 'f1'):
         print(f'  {k.capitalize():<12}: {train_r[k]:.4f}')
 
-    # ── Test metrics ──────────────────────────────────────────────────────────
+    #  Test metrics 
     test_r = evaluate_model(model, X_test, y_test, args.batch_size)
-    print('\n── Test Set Metrics ──────────────────────')
+    print('\n Test Set Metrics ')
     for k in ('accuracy', 'precision', 'recall', 'f1'):
         print(f'  {k.capitalize():<12}: {test_r[k]:.4f}')
 
-    # ── Save JSON ─────────────────────────────────────────────────────────────
+    #  Save JSON 
     out = {k: (v.tolist() if hasattr(v, 'tolist') else v)
            for k, v in test_r.items()}
     os.makedirs(args.save_dir, exist_ok=True)

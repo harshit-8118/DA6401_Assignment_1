@@ -4,10 +4,11 @@ os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import argparse
 import json
 import numpy as np
+import shutil
 
 from ann  import NeuralNetwork
 from utils import (
-    load_dataset, train_val_split,
+    load_dataset, 
     log_5_samples_from_each_class,
     optimizer_showdown,
     vanishing_grad_analysis,
@@ -54,7 +55,7 @@ def make_wandb_run(args, name, group, extra_cfg=None):
     )
 
 
-def _best_model_path(args):
+def best_model_path(args):
     """Always returns the canonical best-model paths under save_dir."""
     return (
         os.path.join(args.save_dir, BEST_MODEL_NPY),
@@ -62,13 +63,8 @@ def _best_model_path(args):
     )
 
 
-def _run_best_model_training(args, CONFIG, x_train, y_train,
+def run_best_model_training(args, CONFIG, x_train, y_train,
                               x_test, y_test, wandb_run):
-    """
-    Train with current args, always saving the best checkpoint to
-    models/best_model.npy + models/best_config.json.
-    Prints a clear summary so you always know which model was saved.
-    """
     train_args = argparse.Namespace(**vars(args))
     train_args.model_save_path = BEST_MODEL_NPY   # force canonical name
 
@@ -78,14 +74,13 @@ def _run_best_model_training(args, CONFIG, x_train, y_train,
                 batch_size=train_args.batch_size,
                 save_dir=train_args.save_dir,
                 wandb_run=wandb_run)
-    import shutil
     src = os.path.join(train_args.save_dir, BEST_MODEL_NPY.replace('.npy', '_config.json'))
     dst = os.path.join(train_args.save_dir, BEST_MODEL_CONFIG)
     if os.path.exists(src):
         shutil.copy2(src, dst)
     test_m = model.evaluate(x_test, y_test, split_name='test')
 
-    weights_path, config_path = _best_model_path(args)
+    weights_path, config_path = best_model_path(args)
     print(f"\n{'='*60}")
     print(f"  BEST MODEL SAVED")
     print(f"  Weights : {weights_path}")
@@ -108,26 +103,13 @@ def _run_best_model_training(args, CONFIG, x_train, y_train,
     return model, test_m
 
 
-def _load_best_model(args, CONFIG):
-    """
-    Load best_model.npy + best_config.json.
-    Prints exactly which file is loaded and what its saved val F1 was.
-    Raises a clear error if file is missing so you know to run --experiment train first.
-    """
-    weights_path, config_path = _best_model_path(args)
+def load_best_model(args, CONFIG):
+    weights_path, config_path = best_model_path(args)
 
-    if not os.path.exists(weights_path):
+    if not os.path.exists(weights_path) or not os.path.exists(config_path):
         raise FileNotFoundError(
-            f"\nBest model not found at: {weights_path}\n"
-            f"Run this first:\n"
-            f"  python train.py --experiment train --epochs 50\n"
+            f"\nBest model not found at: {weights_path}\n or \nBest config not found at: {config_path}\n"
         )
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(
-            f"\nBest config not found at: {config_path}\n"
-            f"Run: python train.py --experiment train --epochs 50\n"
-        )
-
     with open(config_path, 'r') as f:
         cfg = json.load(f)
 
@@ -160,15 +142,15 @@ def main():
 
     exp = args.experiment
 
+    # 2.0 training
     if exp in ('train', 'all'):
         wandb_run = make_wandb_run(args, '2.0_train_best_model', '2.0_train_best_model')
-        _run_best_model_training(args, CONFIG, x_train, y_train,
+        run_best_model_training(args, CONFIG, x_train, y_train,
                                   x_test, y_test, wandb_run)
         if wandb_run is not None:
             wandb_run.finish()
 
-    # ── 2.1  Sample Visualisation ─────────────────────────────────────────────
-    # sweep excluded here — sweep creates its own wandb.init() per run internally
+    #  2.1  Sample Visualisation 
     if exp in ('visual', 'all'):
         wandb_run = make_wandb_run(args, '2.1_samples', '2.1_samples')
         log_5_samples_from_each_class(
@@ -176,15 +158,14 @@ def main():
         if wandb_run is not None:
             wandb_run.finish()
 
-    # ── 2.2  Sweep ────────────────────────────────────────────────────────────
-    # Handled early — sweep manages its own wandb runs, nothing else should run
+    #  2.2  Sweep 
     if exp == 'sweep':
         if args.no_wandb or not _WANDB_AVAILABLE:
             print("W&B sweep requires wandb. Remove --no_wandb.")
             return
         run_sweep(args, CONFIG, x_train, y_train, NeuralNetwork=NeuralNetwork)
 
-    # ── 2.3  Optimizer Showdown ───────────────────────────────────────────────
+    #  2.3  Optimizer Showdown 
     if exp in ('optimizer', 'all'):
         wandb_run = make_wandb_run(args, '2.3_optimizer_showdown',
                                    '2.3_optimizer_showdown')
@@ -193,7 +174,7 @@ def main():
         if wandb_run is not None:
             wandb_run.finish()
 
-    # ── 2.4  Vanishing Gradient ───────────────────────────────────────────────
+    #  2.4  Vanishing Gradient 
     if exp in ('vanishing', 'all'):
         wandb_run = make_wandb_run(args, '2.4_vanishing_gradient',
                                    '2.4_vanishing_gradient')
@@ -202,7 +183,7 @@ def main():
         if wandb_run is not None:
             wandb_run.finish()
 
-    # ── 2.5  Dead Neurons ─────────────────────────────────────────────────────
+    #  2.5  Dead Neurons 
     if exp in ('dead', 'all'):
         wandb_run = make_wandb_run(args, '2.5_dead_neurons', '2.5_dead_neurons')
         dead_neuron_investigation(args, CONFIG, x_train, y_train, 
@@ -210,7 +191,7 @@ def main():
         if wandb_run is not None:
             wandb_run.finish()
 
-    # ── 2.6  Loss Comparison ──────────────────────────────────────────────────
+    #  2.6  Loss Comparison 
     if exp in ('loss', 'all'):
         wandb_run = make_wandb_run(args, '2.6_loss_comparison', '2.6_loss_comparison')
         loss_function_comparison(args, CONFIG, x_train, y_train,
@@ -218,7 +199,7 @@ def main():
         if wandb_run is not None:
             wandb_run.finish()
 
-    # ── 2.7  Overlay ──────────────────────────────────────────────────────────
+    #  2.7  Overlay 
     if exp in ('overlay', 'all'):
         if args.no_wandb or not _WANDB_AVAILABLE:
             print("Overlay pulls data from W&B. Run after sweep with W&B enabled.")
@@ -228,10 +209,10 @@ def main():
             if wandb_run is not None:
                 wandb_run.finish()
 
-    # ── 2.8  Error Analysis — ALWAYS loads best_model.npy ────────────────────
+    #  2.8  Error Analysis — ALWAYS loads best_model.npy 
     if exp in ('error', 'all'):
         try:
-            model = _load_best_model(args, CONFIG)
+            model = load_best_model(args, CONFIG)
         except FileNotFoundError as e:
             print(e)
             if exp == 'all':
@@ -246,7 +227,7 @@ def main():
         if wandb_run is not None:
             wandb_run.finish()
 
-    # ── 2.9  Weight Init Symmetry ─────────────────────────────────────────────
+    #  2.9  Weight Init Symmetry 
     if exp in ('symmetry', 'all'):
         wandb_run = make_wandb_run(args, '2.9_weight_init_symmetry',
                                    '2.9_weight_init_symmetry')
@@ -258,7 +239,7 @@ def main():
         if wandb_run is not None:
             wandb_run.finish()
 
-    # ── 2.10  Fashion Transfer ────────────────────────────────────────────────
+    #  2.10  Fashion Transfer 
     if exp in ('fashion', 'all'):
         (x_f_train, y_f_train), (x_f_test, y_f_test) = load_dataset('fashion_mnist')
         wandb_run = make_wandb_run(args, '2.10_fashion_transfer', '2.10_fashion_transfer')

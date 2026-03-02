@@ -4,19 +4,15 @@ Implements: Cross-Entropy, Mean Squared Error (MSE)
 """
 import numpy as np
 
-
-# ── MEAN SQUARED ERROR ────────────────────────────────────────────────────────
+# MEAN SQUARED ERROR 
 def mse(y_true, y_pred):
     return np.mean((y_true - y_pred) ** 2)
 
 def mse_derivative(y_true, y_pred):
     batch_size = y_true.shape[0]
-    diff  = y_pred - y_true
-    scale = np.sum(diff * y_pred, axis=1, keepdims=True)
-    return (2.0 / batch_size) * y_pred * (diff - scale)
+    return (2.0 / batch_size) * (y_pred - y_true)
 
-
-# ── CROSS-ENTROPY ─────────────────────────────────────────────────────────────
+# CROSS-ENTROPY
 def cross_entropy(y_true, y_pred):
     eps   = 1e-15
     probs = np.clip(y_pred, eps, 1 - eps)

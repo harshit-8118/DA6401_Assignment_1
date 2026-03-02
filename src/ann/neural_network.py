@@ -4,6 +4,7 @@ Handles forward and backward propagation loops
 """
 from .neural_layer import NeuralLayer
 from utils import train_val_split
+from utils.data_loader import compute_metrics
 from .objective_functions import OBJECTIVE
 from .activations import ACTIVATIONS
 from .optimizers import OPTIMIZERS
@@ -12,37 +13,11 @@ import json
 import os
 import argparse
 
-
-# ── Metrics ───────────────────────────────────────────────────────────────────
-
-def compute_metrics(y_true_labels, y_pred_labels, num_classes=10):
-    accuracy = float(np.mean(y_true_labels == y_pred_labels))
-
-    precision_per_class = np.zeros(num_classes)
-    recall_per_class    = np.zeros(num_classes)
-
-    for c in range(num_classes):
-        tp = np.sum((y_pred_labels == c) & (y_true_labels == c))
-        fp = np.sum((y_pred_labels == c) & (y_true_labels != c))
-        fn = np.sum((y_pred_labels != c) & (y_true_labels == c))
-        precision_per_class[c] = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-        recall_per_class[c]    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-
-    precision = float(np.mean(precision_per_class))
-    recall    = float(np.mean(recall_per_class))
-    denom     = precision + recall
-    f1        = float(2 * precision * recall / denom) if denom > 0 else 0.0
-
-    return {'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1': f1}
-
-
-# ── NeuralNetwork ─────────────────────────────────────────────────────────────
-
+#  NeuralNetwork 
 class NeuralNetwork:
     """
     Main model class that orchestrates the neural network training and inference.
     """
-
     def __init__(self, config, cli_args):
         self.config       = config
         self.cli_args     = cli_args
@@ -53,26 +28,18 @@ class NeuralNetwork:
         self._best_val_f1 = -1.0
         self._best_epoch  = 0
 
-        # ── Per-step gradient history for first hidden layer neurons (2.9) ──
         self.grad_history_layer0 = []
-
-        layer_sizes = [784] + list(cli_args.num_neurons)
+        layer_sizes = [784] + list(cli_args.num_neurons) + [10]
         for i in range(len(layer_sizes) - 1):
-            self.layers.append(NeuralLayer(
-                input_size  = layer_sizes[i],
-                output_size = layer_sizes[i + 1],
-                activation  = cli_args.activation,
-                weight_init = cli_args.weight_init,
-                layer_name  = 'hidden',
-            ))
-
-        self.layers.append(NeuralLayer(
-            input_size  = layer_sizes[-1],
-            output_size = 10,
-            activation  = 'identity',
-            weight_init = cli_args.weight_init,
-            layer_name  = 'output',
-        ))
+            is_output = (i == len(layer_sizes) - 2)
+            layer = NeuralLayer(
+                input_size=layer_sizes[i],
+                output_size=layer_sizes[i + 1],
+                activation='identity' if is_output else cli_args.activation,
+                weight_init=cli_args.weight_init,
+                layer_name='output' if is_output else 'hidden'
+            )
+            self.layers.append(layer)
 
         opt_name    = cli_args.optimizer
         opt_cls     = OPTIMIZERS[opt_name]
@@ -88,8 +55,7 @@ class NeuralNetwork:
                                      beta=config['beta'],
                                      epsilon=config['epsilon'])
 
-    # ── Forward ───────────────────────────────────────────────────────────────
-
+    #  Forward 
     def forward(self, X):
         """
         Forward propagation through all layers.
@@ -109,8 +75,7 @@ class NeuralNetwork:
     def predict(self, X):
         return np.argmax(self.predict_proba(X), axis=1)
 
-    # ── Backward ──────────────────────────────────────────────────────────────
-
+    #  Backward 
     def backward(self, y_true, y_pred):
         """
         Backward propagation to compute gradients.
@@ -141,8 +106,7 @@ class NeuralNetwork:
     def update_weights(self):
         self.optimizer.update(self.layers)
 
-    # ── Evaluate ──────────────────────────────────────────────────────────────
-
+    #  Evaluate 
     def evaluate(self, X, y_onehot, split_name='val'):
         logits = self.forward(X)
 
@@ -159,8 +123,7 @@ class NeuralNetwork:
         metrics['loss'] = float(loss)
         return metrics
 
-    # ── Train ─────────────────────────────────────────────────────────────────
-
+    #  Train 
     def train(self, X_train, y_train,
               epochs, batch_size, save_dir='.', wandb_run=None,
               track_grad_steps=50):
@@ -175,11 +138,11 @@ class NeuralNetwork:
         n           = X_train.shape[0]
         global_step = 0
 
-        print(f"\n{'─'*80}")
+        print(f"\n{''*80}")
         print(f"  {n} samples | batch={batch_size} | epochs={epochs} | "
               f"opt={self.cli_args.optimizer} | lr={self.cli_args.learning_rate} | "
               f"wd={self.weight_decay}")
-        print(f"{'─'*80}")
+        print(f"{''*80}")
 
         for epoch in range(epochs):
             idx    = np.random.permutation(n)
@@ -210,7 +173,7 @@ class NeuralNetwork:
                 self.update_weights()
                 global_step += 1
 
-            # ── Per-epoch evaluation ───────────────────────────────────────────
+            #  Per-epoch evaluation 
             sample_idx = np.random.choice(n, size=min(5000, n), replace=False)
             train_m    = self.evaluate(X_train[sample_idx], y_train[sample_idx], 'train')
             val_m      = self.evaluate(X_val, y_val, 'val')
@@ -222,7 +185,7 @@ class NeuralNetwork:
             history['val_acc'].append(val_m['accuracy'])
             history['val_f1'].append(val_m['f1'])
 
-            print('─' * 50)
+            print('' * 50)
             print(f"epoch [{epoch+1}/{epochs}]")
             print(f"Train  Loss:{train_m['loss']:.6f}  Acc:{train_m['accuracy']:.4f}  F1:{train_m['f1']:.4f}")
             print(f"Valid  Loss:{val_m['loss']:.6f}  Acc:{val_m['accuracy']:.4f}  F1:{val_m['f1']:.4f}")
@@ -258,12 +221,11 @@ class NeuralNetwork:
                 self.save_model(save_dir)
 
         print(f"\n  Best val F1={self._best_val_f1:.4f} at epoch {self._best_epoch}")
-        print(f"{'─'*80}\n")
+        print(f"{''*80}\n")
 
         return history
 
-    # ── Get / Set Weights ─────────────────────────────────────────────────────
-
+    #  Get / Set Weights 
     def get_weights(self):
         d = {}
         for i, layer in enumerate(self.layers):
@@ -280,8 +242,7 @@ class NeuralNetwork:
             if b_key in weight_dict:
                 layer.b = weight_dict[b_key].copy()
 
-    # ── Save / Load ───────────────────────────────────────────────────────────
-
+    #  Save / Load 
     def save_model(self, save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
