@@ -6,9 +6,6 @@ Handles MNIST and Fashion-MNIST datasets
 from keras.datasets import mnist, fashion_mnist
 import numpy as np 
 
-
-
-
 def initialize_weights(weight_init, input_size, output_size):
     if weight_init == 'random':
         return np.random.randn(input_size, output_size) * 0.01

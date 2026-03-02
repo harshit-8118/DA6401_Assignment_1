@@ -1,7 +1,6 @@
 """
-Main Neural Network Model
-Handles forward/backward propagation, training, evaluation,
-and gradient tracking for weight-init symmetry analysis.
+Main Neural Network Model class
+Handles forward and backward propagation loops
 """
 from .neural_layer import NeuralLayer
 from utils import train_val_split
@@ -40,6 +39,9 @@ def compute_metrics(y_true_labels, y_pred_labels, num_classes=10):
 # ── NeuralNetwork ─────────────────────────────────────────────────────────────
 
 class NeuralNetwork:
+    """
+    Main model class that orchestrates the neural network training and inference.
+    """
 
     def __init__(self, config, cli_args):
         self.config       = config
@@ -52,7 +54,6 @@ class NeuralNetwork:
         self._best_epoch  = 0
 
         # ── Per-step gradient history for first hidden layer neurons (2.9) ──
-        # shape: list of arrays (num_neurons_in_layer_0,)
         self.grad_history_layer0 = []
 
         layer_sizes = [784] + list(cli_args.num_neurons)
@@ -86,9 +87,16 @@ class NeuralNetwork:
             self.optimizer = opt_cls(learning_rate=cli_args.learning_rate,
                                      beta=config['beta'],
                                      epsilon=config['epsilon'])
+
     # ── Forward ───────────────────────────────────────────────────────────────
 
     def forward(self, X):
+        """
+        Forward propagation through all layers.
+        Returns logits (no softmax applied).
+        X is shape (b, D_in) and output is shape (b, D_out).
+        b is batch size, D_in is input dimension, D_out is output dimension.
+        """
         out = X
         for layer in self.layers:
             out = layer.forward(out)
@@ -104,10 +112,30 @@ class NeuralNetwork:
     # ── Backward ──────────────────────────────────────────────────────────────
 
     def backward(self, y_true, y_pred):
+        """
+        Backward propagation to compute gradients.
+        Returns two numpy arrays: grad_Ws, grad_bs.
+        - grad_Ws[0] is gradient for the last (output) layer weights,
+          grad_bs[0] is gradient for the last layer biases, and so on.
+        """
         loss_val = self.loss(y_true=y_true, y_pred=y_pred)
         delta    = self.loss_grad(y_true=y_true, y_pred=y_pred)
+
+        grad_W_list = []
+        grad_b_list = []
+
         for layer in reversed(self.layers):
             delta = layer.backward(delta, weight_decay=self.weight_decay)
+            grad_W_list.append(layer.grad_W)
+            grad_b_list.append(layer.grad_b)
+
+        # index 0 = last (output) layer, as per template
+        self.grad_W = np.empty(len(grad_W_list), dtype=object)
+        self.grad_b = np.empty(len(grad_b_list), dtype=object)
+        for i, (gw, gb) in enumerate(zip(grad_W_list, grad_b_list)):
+            self.grad_W[i] = gw
+            self.grad_b[i] = gb
+
         return loss_val
 
     def update_weights(self):
@@ -126,18 +154,17 @@ class NeuralNetwork:
             loss       = self.loss(y_true=y_onehot, y_pred=probs)
             y_pred_lbl = np.argmax(probs, axis=1)
 
-        y_true_lbl  = np.argmax(y_onehot, axis=1)
-        metrics     = compute_metrics(y_true_lbl, y_pred_lbl)
+        y_true_lbl      = np.argmax(y_onehot, axis=1)
+        metrics         = compute_metrics(y_true_lbl, y_pred_lbl)
         metrics['loss'] = float(loss)
         return metrics
 
     # ── Train ─────────────────────────────────────────────────────────────────
 
     def train(self, X_train, y_train,
-          epochs, batch_size, save_dir='.', wandb_run=None,
-          track_grad_steps=50):
+              epochs, batch_size, save_dir='.', wandb_run=None,
+              track_grad_steps=50):
 
-    # ── init history ──────────────────────────────────────────────────────
         history = {
             'train_loss': [], 'train_acc': [], 'train_f1': [],
             'val_loss'  : [], 'val_acc' : [], 'val_f1'  : [],
@@ -150,8 +177,8 @@ class NeuralNetwork:
 
         print(f"\n{'─'*80}")
         print(f"  {n} samples | batch={batch_size} | epochs={epochs} | "
-            f"opt={self.cli_args.optimizer} | lr={self.cli_args.learning_rate} | "
-            f"wd={self.weight_decay}")
+              f"opt={self.cli_args.optimizer} | lr={self.cli_args.learning_rate} | "
+              f"wd={self.weight_decay}")
         print(f"{'─'*80}")
 
         for epoch in range(epochs):
@@ -169,7 +196,7 @@ class NeuralNetwork:
                 logits = self.forward(X_b)
                 if self.cli_args.loss == 'mse':
                     loss = self.backward(y_true=y_b, y_pred=logits)
-                else: 
+                else:
                     probs = self.predict_proba(X_b)
                     loss  = self.backward(y_true=y_b, y_pred=probs)
 
@@ -188,7 +215,6 @@ class NeuralNetwork:
             train_m    = self.evaluate(X_train[sample_idx], y_train[sample_idx], 'train')
             val_m      = self.evaluate(X_val, y_val, 'val')
 
-            # ── Record history ─────────────────────────────────────────────────
             history['train_loss'].append(train_m['loss'])
             history['train_acc'].append(train_m['accuracy'])
             history['train_f1'].append(train_m['f1'])
@@ -234,16 +260,33 @@ class NeuralNetwork:
         print(f"\n  Best val F1={self._best_val_f1:.4f} at epoch {self._best_epoch}")
         print(f"{'─'*80}\n")
 
-        return history  # ← added
+        return history
+
+    # ── Get / Set Weights ─────────────────────────────────────────────────────
+
+    def get_weights(self):
+        d = {}
+        for i, layer in enumerate(self.layers):
+            d[f"W{i}"] = layer.W.copy()
+            d[f"b{i}"] = layer.b.copy()
+        return d
+
+    def set_weights(self, weight_dict):
+        for i, layer in enumerate(self.layers):
+            w_key = f"W{i}"
+            b_key = f"b{i}"
+            if w_key in weight_dict:
+                layer.W = weight_dict[w_key].copy()
+            if b_key in weight_dict:
+                layer.b = weight_dict[b_key].copy()
 
     # ── Save / Load ───────────────────────────────────────────────────────────
 
     def save_model(self, save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
-        params = [{'W': l.W.copy(), 'b': l.b.copy()} for l in self.layers]
         weights_filename = getattr(self.cli_args, 'model_save_path', 'best_model.npy')
-        np.save(os.path.join(save_dir, weights_filename), params, allow_pickle=True)
+        np.save(os.path.join(save_dir, weights_filename), self.get_weights(), allow_pickle=True)
 
         best_config = {
             'num_neurons'  : list(self.cli_args.num_neurons),
@@ -257,11 +300,12 @@ class NeuralNetwork:
             'best_epoch'   : int(self._best_epoch),
             'dataset'      : getattr(self.cli_args, 'dataset', 'mnist'),
         }
+
         config_filename = weights_filename.replace('.npy', '_config.json')
-        with open(os.path.join(save_dir,  config_filename), 'w') as f:
+        with open(os.path.join(save_dir, config_filename), 'w') as f:
             json.dump(best_config, f, indent=2)
 
-        print(f"   → Saved to '{save_dir}/' "
+        print(f"   → Saved {weights_filename} + {config_filename} "
               f"(val_f1={self._best_val_f1:.4f}, epoch={self._best_epoch})")
 
     @classmethod
@@ -282,16 +326,13 @@ class NeuralNetwork:
         )
 
         model  = cls(hyperparams_config, cli_args)
-        params = np.load(weights_path, allow_pickle=True)
-        for layer, p in zip(model.layers, params):
-            layer.W = p['W'].copy()
-            layer.b = p['b'].copy()
+        weight_dict = np.load(weights_path, allow_pickle=True).item() 
+        model.set_weights(weight_dict) 
 
         print(f"Model loaded from '{weights_path}'")
         print(f"  Architecture : 784 → {' → '.join(str(n) for n in cfg['num_neurons'])} → 10")
         print(f"  Best val F1  : {cfg.get('best_val_f1', 'N/A')}")
         return model
-
 
     def layer_gradient_norms(self):
         return [float(np.linalg.norm(l.grad_W)) if l.grad_W is not None else 0.0

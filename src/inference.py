@@ -1,10 +1,15 @@
+"""
+Inference Script
+Evaluate trained models on test sets
+"""
+
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import argparse
+import json
 
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import numpy as np
 
 try:
@@ -17,13 +22,31 @@ from ann  import NeuralNetwork
 from utils import load_dataset, parse_arguments, CONFIG
 
 
-def evaluate_batched(model, X, y_onehot, batch_size=512):
+def load_model(model_path, config_path=None):
+    """
+    Load trained model from disk.
+    """
+    if config_path is None:
+        config_path = model_path.replace('.npy', '_config.json')
+    return NeuralNetwork.load(model_path, config_path, CONFIG)
+
+
+def evaluate_model(model, X_test, y_onehot, batch_size=512):
+    """
+    Evaluate model on test data.
+
+    Returns Dictionary - logits, loss, accuracy, f1, precision, recall
+    """
     from sklearn.metrics import (accuracy_score, precision_score,
                                  recall_score, f1_score, confusion_matrix)
-    n         = X.shape[0]
-    all_probs = []
+    n          = X_test.shape[0]
+    all_logits = []
+    all_probs  = []
     for start in range(0, n, batch_size):
-        all_probs.append(model.predict_proba(X[start : start + batch_size]))
+        X_b = X_test[start : start + batch_size]
+        all_logits.append(model.forward(X_b))
+        all_probs.append(model.predict_proba(X_b))
+    logits     = np.vstack(all_logits)
     probs      = np.vstack(all_probs)
     y_pred_lbl = np.argmax(probs,    axis=1)
     y_true_lbl = np.argmax(y_onehot, axis=1)
@@ -37,11 +60,17 @@ def evaluate_batched(model, X, y_onehot, batch_size=512):
         'f1'              : f1_score(y_true_lbl, y_pred_lbl,
                                      average='macro', zero_division=0),
         'confusion_matrix': confusion_matrix(y_true_lbl, y_pred_lbl),
+        'logits'          : logits,
     }
 
 
 def main():
-    args = parse_arguments()
+    """
+    Main inference function.
+
+    Returns Dictionary - logits, loss, accuracy, f1, precision, recall
+    """
+    args         = parse_arguments()
     weights_path = os.path.join(args.save_dir, args.model_save_path)
     config_path  = os.path.join(args.save_dir, args.config_path)
 
@@ -57,25 +86,24 @@ def main():
         )
 
     # ── Load model ────────────────────────────────────────────────────────────
-    model = NeuralNetwork.load(weights_path, config_path, CONFIG)
+    model = load_model(weights_path, config_path)
 
     # ── Load data ─────────────────────────────────────────────────────────────
     (X_train, y_train), (X_test, y_test) = load_dataset(args.dataset)
 
     # ── Train metrics ─────────────────────────────────────────────────────────
-    train_r = evaluate_batched(model, X_train, y_train, args.batch_size)
+    train_r = evaluate_model(model, X_train, y_train, args.batch_size)
     print('\n── Train Set Metrics ─────────────────────')
     for k in ('accuracy', 'precision', 'recall', 'f1'):
         print(f'  {k.capitalize():<12}: {train_r[k]:.4f}')
 
     # ── Test metrics ──────────────────────────────────────────────────────────
-    test_r = evaluate_batched(model, X_test, y_test, args.batch_size)
+    test_r = evaluate_model(model, X_test, y_test, args.batch_size)
     print('\n── Test Set Metrics ──────────────────────')
     for k in ('accuracy', 'precision', 'recall', 'f1'):
         print(f'  {k.capitalize():<12}: {test_r[k]:.4f}')
 
     # ── Save JSON ─────────────────────────────────────────────────────────────
-    import json
     out = {k: (v.tolist() if hasattr(v, 'tolist') else v)
            for k, v in test_r.items()}
     os.makedirs(args.save_dir, exist_ok=True)
@@ -86,6 +114,7 @@ def main():
     if wandb_run is not None:
         wandb_run.finish()
 
+    print("Evaluation complete!")
     return test_r
 
 

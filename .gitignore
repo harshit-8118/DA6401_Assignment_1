@@ -1,5 +1,6 @@
 venv/
 archived/
+<<<<<<< HEAD
 *__pycache__/
 *.pyc
 .env
@@ -7,3 +8,7 @@ models/
 logs/
 wandb/
 sweep_models/
+=======
+notebooks/
+models/
+>>>>>>> c2482e3fe43ea053bd5a28016315658e33b81db6
