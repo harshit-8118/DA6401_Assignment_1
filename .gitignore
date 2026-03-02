@@ -1,0 +1,9 @@
+venv/
+archived/
+*__pycache__/
+*.pyc
+.env
+models/
+logs/
+wandb/
+sweep_models/
