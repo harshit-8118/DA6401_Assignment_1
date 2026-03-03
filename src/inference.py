@@ -21,6 +21,7 @@ from utils import load_dataset, parse_arguments, CONFIG
 def load_model(model_path, config_path=None):
     if config_path is None:
         config_path = model_path.replace('.npy', '_config.json')
+    print("These are the paths: ", model_path, config_path)
     return NeuralNetwork.load(model_path, config_path, CONFIG)
 
 
@@ -53,7 +54,7 @@ def evaluate_model(model, X_test, y_onehot, batch_size=512):
 def main():
     args         = parse_arguments()
     weights_path = os.path.join(args.save_dir, args.model_save_path)
-    config_path  = os.path.join(args.save_dir, args.config_path)
+    config_path  = None
 
     #  W&B 
     use_wandb = (not args.no_wandb) and _WANDB_AVAILABLE

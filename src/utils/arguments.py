@@ -1,7 +1,7 @@
 import argparse
 
 ENTITY  = 'da25s003-indian-institute-of-technology-madras'
-PROJECT = 'DA6401_Assignment1v4'
+PROJECT = 'DA6401_Assignment1v5'
 
 BEST_MODEL_NPY    = 'best_model.npy'
 BEST_MODEL_CONFIG = 'best_config.json'
@@ -15,10 +15,10 @@ CONFIG = {
 def parse_arguments():
     p = argparse.ArgumentParser(description='DA6401 Assignment-1 — Neural Network')
     p.add_argument('-d', '--dataset',  type=str, default='mnist', choices=['mnist', 'fashion_mnist', 'fashion'])
-    p.add_argument('-e',  '--epochs', type=int,   default=30)
-    p.add_argument('-b',  '--batch_size', type=int,   default=64)
+    p.add_argument('-e',  '--epochs', type=int,   default=50)
+    p.add_argument('-b',  '--batch_size', type=int,   default=32)
     p.add_argument('-lr', '--learning_rate',  type=float, default=0.001)
-    p.add_argument('-o',  '--optimizer', type=str, default='rmsprop',  choices=['sgd', 'momentum', 'nag', 'rmsprop'])
+    p.add_argument('-o',  '--optimizer', type=str, default='momentum',  choices=['sgd', 'momentum', 'nag', 'rmsprop'])
     p.add_argument('-l',  '--loss', type=str,   default='cross_entropy', choices=['mse', 'cross_entropy'])
     p.add_argument('-wd', '--weight_decay',   type=float, default=0.0)
     p.add_argument('-sz', '--num_neurons', type=int,   nargs='+', default=[128, 128, 64])

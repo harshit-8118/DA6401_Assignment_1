@@ -6,11 +6,11 @@
   ],
   "activation": "relu",
   "weight_init": "xavier",
-  "optimizer": "rmsprop",
-  "learning_rate": 0.001,
+  "optimizer": "momentum",
+  "learning_rate": 0.01,
   "weight_decay": 0.0,
   "loss": "cross_entropy",
-  "best_val_f1": 0.979454223713717,
-  "best_epoch": 13,
+  "best_val_f1": 0.9818194636856538,
+  "best_epoch": 41,
   "dataset": "mnist"
 }
