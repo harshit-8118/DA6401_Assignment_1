@@ -17,7 +17,7 @@ def parse_arguments():
     p.add_argument('-d', '--dataset',  type=str, default='mnist', choices=['mnist', 'fashion_mnist', 'fashion'])
     p.add_argument('-e',  '--epochs', type=int,   default=50)
     p.add_argument('-b',  '--batch_size', type=int,   default=32)
-    p.add_argument('-lr', '--learning_rate',  type=float, default=0.001)
+    p.add_argument('-lr', '--learning_rate',  type=float, default=0.01)
     p.add_argument('-o',  '--optimizer', type=str, default='momentum',  choices=['sgd', 'momentum', 'nag', 'rmsprop'])
     p.add_argument('-l',  '--loss', type=str,   default='cross_entropy', choices=['mse', 'cross_entropy'])
     p.add_argument('-wd', '--weight_decay',   type=float, default=0.0)

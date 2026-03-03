@@ -10,7 +10,7 @@
   "learning_rate": 0.01,
   "weight_decay": 0.0,
   "loss": "cross_entropy",
-  "best_val_f1": 0.9818194636856538,
-  "best_epoch": 41,
+  "best_val_f1": 0.9818325815435327,
+  "best_epoch": 35,
   "dataset": "mnist"
 }

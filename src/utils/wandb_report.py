@@ -160,8 +160,8 @@ def run_sweep(args, CONFIG, x_train, y_train, NeuralNetwork=None):
         "method": "bayes",
         "metric": {"name": "val/accuracy", "goal": "maximize"},
         "parameters": {
-            "epochs": {"values": [5, 10, 30]},
-            "batch_size": {"values": [32, 64]},
+            "epochs": {"values": [5, 10, 30, 50]},
+            "batch_size": {"values": [32, 64, 128]},
             "learning_rate": {"values": [0.0001, 0.0005, 0.001, 0.005, 0.01]},
             "optimizer": {"values": ["sgd", "momentum", "nag", "rmsprop"]},
             "num_neurons": {
@@ -890,11 +890,11 @@ def fashion_mnist_transfer(
             "epochs": getattr(args, "epochs", 30),
         },
         {
-            "name": "Config3_rmsprop_relu_128_128_128",
+            "name": "Config3_rmsprop_relu_128_128_64",
             "optimizer": "rmsprop",
             "activation": "relu",
-            "num_neurons": [128, 128, 128],
-            "learning_rate": 0.001,
+            "num_neurons": [128, 128, 64],
+            "learning_rate": 0.0005,
             "weight_decay": 0.0,
             "batch_size": 128,
             "epochs": getattr(args, "epochs", 30),

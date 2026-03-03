@@ -101,7 +101,7 @@ class NeuralNetwork:
             self.grad_W[i] = gw
             self.grad_b[i] = gb
 
-        return loss_val
+        return self.grad_W, self.grad_b
 
     def update_weights(self):
         self.optimizer.update(self.layers)
@@ -158,10 +158,10 @@ class NeuralNetwork:
 
                 logits = self.forward(X_b)
                 if self.cli_args.loss == 'mse':
-                    loss = self.backward(y_true=y_b, y_pred=logits)
+                    (gw, gb) = self.backward(y_true=y_b, y_pred=logits)
                 else:
                     probs = self.predict_proba(X_b)
-                    loss  = self.backward(y_true=y_b, y_pred=probs)
+                    (gw, gb)  = self.backward(y_true=y_b, y_pred=probs)
 
                 if self.is_nag:
                     self.optimizer.restore(self.layers)
