@@ -1,4 +1,9 @@
 venv/
 archived/
-notebooks/
+*__pycache__/
+*.pyc
+.env
 models/
+logs/
+wandb/
+sweep_models/
