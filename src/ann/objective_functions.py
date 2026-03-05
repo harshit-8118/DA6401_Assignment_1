@@ -16,13 +16,13 @@ def mse_derivative(y_true, y_pred):
 def cross_entropy(y_true, y_pred):
     eps   = 1e-15
     probs = np.clip(y_pred, eps, 1 - eps)
-    return -np.mean(np.sum(y_true * np.log(probs), axis=1))
+    return -np.sum(y_true * np.log(probs)) /  y_pred.shape[0]
 
 def cross_entropy_derivative(y_true, y_pred):
     epsilon    = 1e-9
     batch_size = y_true.shape[0]
     y_pred     = np.clip(y_pred, epsilon, 1 - epsilon)
-    return (y_pred - y_true) / batch_size
+    return (y_pred - y_true)
 
 
 OBJECTIVE = {
