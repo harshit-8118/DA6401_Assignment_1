@@ -34,72 +34,13 @@ class NeuralNetwork:
 
         self.grad_history_layer0 = []
 
-        # Resolve num_neurons from cli_args with multiple fallback strategies
-        # Priority: num_neurons > hidden_size > num_layers > default [128, 128, 64]
-        num_neurons = None
-        
-        if hasattr(cli_args, 'num_neurons') and cli_args.num_neurons is not None:
-            num_neurons = list(cli_args.num_neurons)
-        elif hasattr(cli_args, 'hidden_size') and cli_args.hidden_size is not None:
-            hs = cli_args.hidden_size
-            # If hidden_size is already a list, use it directly
-            if isinstance(hs, (list, tuple)):
-                num_neurons = list(hs)
-            elif isinstance(hs, int):
-                # If it's a single int, repeat for num_layers times
-                nl = getattr(cli_args, 'num_layers', 3)
-                num_neurons = [hs] * nl
-            else:
-                # Shouldn't happen, but fallback
-                num_neurons = [128, 128, 64]
-        elif hasattr(cli_args, 'num_layers') and cli_args.num_layers is not None:
-            # fallback: 128 neurons per layer
-            num_neurons = [128] * cli_args.num_layers
-        
-        # Final fallback: use sensible defaults
-        # NOTE: Tests use fixed weights for architecture [64] (single hidden layer)
-        if num_neurons is None:
-            num_neurons = [64]  # Single hidden layer of 64 neurons
-            cli_args.num_layers = 1
-            cli_args.hidden_size = num_neurons
-
-        # Store resolved list on both cli_args and self for use in save_model etc.
-        self.cli_args.num_neurons = num_neurons
-        self.hidden_size = num_neurons
-        
-        # Ensure all required attributes exist on cli_args BEFORE building layers
-        if not hasattr(cli_args, 'activation'):
-            cli_args.activation = 'relu'
-        if not hasattr(cli_args, 'weight_init'):
-            cli_args.weight_init = 'xavier'
-        if not hasattr(cli_args, 'optimizer'):
-            cli_args.optimizer = 'momentum'
-        if not hasattr(cli_args, 'learning_rate'):
-            cli_args.learning_rate = 0.01
-        if not hasattr(cli_args, 'loss'):
-            cli_args.loss = 'cross_entropy'
-        if not hasattr(cli_args, 'beta'):
-            cli_args.beta = 0.9
-        if not hasattr(cli_args, 'epsilon'):
-            cli_args.epsilon = 1e-8
-        if not hasattr(cli_args, 'val_fraction'):
-            cli_args.val_fraction = 0.1
-        if not hasattr(cli_args, 'seed'):
-            cli_args.seed = 42
-        if not hasattr(cli_args, 'dataset'):
-            cli_args.dataset = 'mnist'
-        if not hasattr(cli_args, 'weight_decay'):
-            cli_args.weight_decay = 0.0
-        if not hasattr(cli_args, 'num_layers'):
-            cli_args.num_layers = len(num_neurons)
-        if not hasattr(cli_args, 'hidden_size'):
-            cli_args.hidden_size = num_neurons
+        self.hidden_size = getattr(cli_args, 'hidden_size', [128, 128, 64])
         
         # Re-initialize loss in case it was added above
         self.loss, self.loss_grad = OBJECTIVE[cli_args.loss]
 
         # Build layer sizes: [784] + hidden + [10]
-        self._built = False 
+        self.is_built = False 
         self.layers = []
 
         # Build optimizer
@@ -118,19 +59,15 @@ class NeuralNetwork:
             self.optimizer = opt_cls(learning_rate=cli_args.learning_rate,
                                      beta=beta, epsilon=epsilon)
 
-        # Initialize grad_w and grad_b arrays to match spec
-        # These will be populated during backward pass
         self.grad_b = None
-        self.grad_w = None  # lowercase alias for autograder
+        self.grad_w = None  
 
-    # ── Forward ───────────────────────────────────────────────────────────────
+    #  Forward 
     def forward(self, X):
-        # DYNAMICALLY build layers on the first call based on X.shape[1]
-        if not hasattr(self, '_built') or not self._built:
-            input_dim = X.shape[1] # This will be 2 for the toy test, 784 for MNIST
+        if not hasattr(self, 'is_built') or not self.is_built:
+            input_dim = X.shape[1] 
             output_dim = 10 
             
-            # Architecture: [Input] -> [Hidden...] -> [Output]
             layer_sizes = [input_dim] + self.hidden_size + [output_dim]
             self.layers = []
             
@@ -143,7 +80,7 @@ class NeuralNetwork:
                     weight_init = self.cli_args.weight_init,
                     layer_name  = 'output' if is_output else 'hidden'
                 ))
-            self._built = True
+            self.is_built = True
 
         out = X
         for layer in self.layers:
@@ -157,7 +94,7 @@ class NeuralNetwork:
     def predict(self, X):
         return np.argmax(self.predict_proba(X), axis=1)
 
-    # ── Backward ──────────────────────────────────────────────────────────────
+    #  Backward 
     def backward(self, y_true, y_pred):
         """
         Backward propagation to compute gradients.
@@ -180,15 +117,15 @@ class NeuralNetwork:
         self.grad_b = np.empty(len(grad_b_list), dtype=object)
         
         for i, (gw, gb) in enumerate(zip(grad_w_list, grad_b_list)):
-            self.grad_w[i] = gw  # Each element is a 2D array
-            self.grad_b[i] = gb  # Each element is a (1, size) array
+            self.grad_w[i] = gw  
+            self.grad_b[i] = gb 
         
-        return self.grad_w[::-1], self.grad_b[::-1]
+        return self.grad_w, self.grad_b
 
     def update_weights(self):
         self.optimizer.update(self.layers)
 
-    # ── Evaluate ──────────────────────────────────────────────────────────────
+    #  Evaluate 
     def evaluate(self, X, y_onehot, split_name='val'):
         logits = self.forward(X)
         if self.cli_args.loss == 'mse':
@@ -204,7 +141,7 @@ class NeuralNetwork:
         metrics['loss'] = float(loss)
         return metrics
 
-    # ── Train ─────────────────────────────────────────────────────────────────
+    #  Train 
     def train(self, X_train, y_train,
               epochs, batch_size, save_dir='.', wandb_run=None,
               track_grad_steps=50):
@@ -306,7 +243,7 @@ class NeuralNetwork:
         print(f"\n  Best val F1={self._best_val_f1:.4f} at epoch {self._best_epoch}\n")
         return history
 
-    # ── Get / Set Weights ─────────────────────────────────────────────────────
+    #  Get / Set Weights 
     def get_weights(self):
         d = {}
         for i, layer in enumerate(self.layers):
@@ -318,10 +255,7 @@ class NeuralNetwork:
         """
         Modified to handle dynamic building during inference.
         """
-        # If the model isn't built yet, we infer the architecture from the weights
-        if not self._built:
-            # Determine sizes from weight_dict keys W0, W1...
-            # W0 shape is (input_dim, first_hidden_dim)
+        if not self.is_built:
             for i in range(len(weight_dict) // 2):
                 w_key = f'W{i}'
                 input_dim, output_dim = weight_dict[w_key].shape
@@ -333,7 +267,7 @@ class NeuralNetwork:
                     activation='identity' if is_output else self.cli_args.activation,
                     layer_name='output' if is_output else 'hidden'
                 ))
-            self._built = True
+            self.is_built = True
 
         # Standard loading logic
         for i, layer in enumerate(self.layers):
@@ -342,7 +276,7 @@ class NeuralNetwork:
             if f'b{i}' in weight_dict:
                 layer.b = weight_dict[f'b{i}'].copy()
 
-    # ── Save / Load ───────────────────────────────────────────────────────────
+    #  Save / Load 
     def save_model(self, save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
@@ -369,7 +303,7 @@ class NeuralNetwork:
         with open(config_path, 'w') as f:
             json.dump(cfg, f, indent=2)
 
-        print(f"   → Saved {weights_filename}  val_f1={self._best_val_f1:.4f}"
+        print(f"    Saved {weights_filename}  val_f1={self._best_val_f1:.4f}"
               f"  epoch={self._best_epoch}")
 
     @classmethod
@@ -382,7 +316,7 @@ class NeuralNetwork:
         with open(config_path, 'r') as f:
             cfg = json.load(f)
 
-        hidden_size = cfg.get('hidden_size', cfg.get('num_neurons', [128]))
+        hidden_size = cfg.get('hidden_size', [128, 128, 64])
         cli_args = argparse.Namespace(
             hidden_size     = hidden_size,
             num_layers      = cfg.get('num_layers', len(hidden_size)),
@@ -395,7 +329,6 @@ class NeuralNetwork:
             epochs          = cfg.get('epochs', 0),
             dataset         = cfg.get('dataset', 'mnist'),
             model_save_path = os.path.basename(weights_path),
-            # Add missing attributes with sensible defaults
             beta            = 0.9,
             epsilon         = 1e-8,
         )
@@ -407,8 +340,8 @@ class NeuralNetwork:
         model._best_epoch  = cfg.get('best_epoch',  0)
 
         print(f"Model loaded from '{weights_path}'")
-        print(f"  Architecture : 784 → "
-              f"{' → '.join(str(n) for n in hidden_size)} → 10")
+        print(f"  Architecture : 784  "
+              f"{'  '.join(str(n) for n in hidden_size)}  10")
         print(f"  Best val F1  : {cfg.get('best_val_f1', 'N/A')}  "
               f"(epoch {cfg.get('best_epoch', 'N/A')})")
         return model
