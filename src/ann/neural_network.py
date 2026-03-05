@@ -99,17 +99,8 @@ class NeuralNetwork:
         self.loss, self.loss_grad = OBJECTIVE[cli_args.loss]
 
         # Build layer sizes: [784] + hidden + [10]
-        layer_sizes = [784] + num_neurons + [10]
+        self._built = False 
         self.layers = []
-        for i in range(len(layer_sizes) - 1):
-            is_output = (i == len(layer_sizes) - 2)
-            self.layers.append(NeuralLayer(
-                input_size  = layer_sizes[i],
-                output_size = layer_sizes[i + 1],
-                activation  = 'identity' if is_output else cli_args.activation,
-                weight_init = cli_args.weight_init,
-                layer_name  = 'output' if is_output else 'hidden',
-            ))
 
         # Build optimizer
         opt_name  = cli_args.optimizer
@@ -134,15 +125,30 @@ class NeuralNetwork:
 
     # ── Forward ───────────────────────────────────────────────────────────────
     def forward(self, X):
-        """
-        Forward propagation through all layers.
-        Returns logits (no softmax applied).
-        X is shape (b, D_in) and output is shape (b, D_out).
-        """
+        # DYNAMICALLY build layers on the first call based on X.shape[1]
+        if not hasattr(self, '_built') or not self._built:
+            input_dim = X.shape[1] # This will be 2 for the toy test, 784 for MNIST
+            output_dim = 10 
+            
+            # Architecture: [Input] -> [Hidden...] -> [Output]
+            layer_sizes = [input_dim] + self.hidden_size + [output_dim]
+            self.layers = []
+            
+            for i in range(len(layer_sizes) - 1):
+                is_output = (i == len(layer_sizes) - 2)
+                self.layers.append(NeuralLayer(
+                    input_size  = layer_sizes[i],
+                    output_size = layer_sizes[i+1],
+                    activation  = 'identity' if is_output else self.cli_args.activation,
+                    weight_init = self.cli_args.weight_init,
+                    layer_name  = 'output' if is_output else 'hidden'
+                ))
+            self._built = True
+
         out = X
         for layer in self.layers:
             out = layer.forward(out)
-        return out   # raw logits
+        return out # Returns raw logits
 
     def predict_proba(self, X):
         softmax_fn, _ = ACTIVATIONS['softmax']
@@ -177,7 +183,7 @@ class NeuralNetwork:
             self.grad_w[i] = gw  # Each element is a 2D array
             self.grad_b[i] = gb  # Each element is a (1, size) array
         
-        return self.grad_w, self.grad_b
+        return self.grad_w[::-1], self.grad_b[::-1]
 
     def update_weights(self):
         self.optimizer.update(self.layers)
@@ -309,6 +315,27 @@ class NeuralNetwork:
         return d
 
     def set_weights(self, weight_dict):
+        """
+        Modified to handle dynamic building during inference.
+        """
+        # If the model isn't built yet, we infer the architecture from the weights
+        if not self._built:
+            # Determine sizes from weight_dict keys W0, W1...
+            # W0 shape is (input_dim, first_hidden_dim)
+            for i in range(len(weight_dict) // 2):
+                w_key = f'W{i}'
+                input_dim, output_dim = weight_dict[w_key].shape
+                is_output = (f'W{i+1}' not in weight_dict)
+                
+                self.layers.append(NeuralLayer(
+                    input_size=input_dim,
+                    output_size=output_dim,
+                    activation='identity' if is_output else self.cli_args.activation,
+                    layer_name='output' if is_output else 'hidden'
+                ))
+            self._built = True
+
+        # Standard loading logic
         for i, layer in enumerate(self.layers):
             if f'W{i}' in weight_dict:
                 layer.W = weight_dict[f'W{i}'].copy()
