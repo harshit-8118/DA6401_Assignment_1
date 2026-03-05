@@ -56,8 +56,9 @@ class NeuralLayer:
     #  Backward 
     def backward(self, delta):
         dz = delta * self.activation_grad(self.Z)
-        self.grad_w = self.X.T @ dz
-        self.grad_b = np.sum(dz, axis=0, keepdims=True)    # Shape: (1, output_size)
+        m = self.X.shape[0]
+        self.grad_w = (self.X.T @ dz) / m
+        self.grad_b = np.sum(dz, axis=0, keepdims=True) / m   # Shape: (1, output_size)
         
         # if self.layer_name == 'hidden':
         #     self.grad_history.append(np.abs(dz).mean(axis=0))

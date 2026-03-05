@@ -109,8 +109,9 @@ class NeuralNetwork:
         delta = self.loss_grad(y_true, y_pred)
         for layer in reversed(self.layers):
             if layer.layer_name == 'output':
-                layer.grad_w = layer.X.T @ delta
-                layer.grad_b = np.sum(delta, axis=0, keepdims=True)   
+                m = layer.X.shape[0]
+                layer.grad_w = (layer.X.T @ delta) / m
+                layer.grad_b = np.sum(delta, axis=0, keepdims=True) / m
                 delta = delta @ layer.W.T
             else:
                 delta = layer.backward(delta)

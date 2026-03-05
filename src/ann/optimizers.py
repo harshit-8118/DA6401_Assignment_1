@@ -7,9 +7,8 @@ class SGD:
 
     def update(self, layers):
         for layer in layers:
-            n = layer.X.shape[0]
-            grad_w = layer.grad_w / n + self.weight_decay * layer.W
-            grad_b = layer.grad_b / n 
+            grad_w = layer.grad_w + self.weight_decay * layer.W
+            grad_b = layer.grad_b 
             
             layer.W -= self.lr * grad_w
             layer.b -= self.lr * grad_b
@@ -36,11 +35,11 @@ class Momentum:
         for i, layer in enumerate(layers):
             n = layer.X.shape[0]
             # Include weight decay in the gradient calculation
-            grad_w = layer.grad_w / n + self.weight_decay * layer.W
-            grad_b = layer.grad_b / n 
+            grad_w = layer.grad_w + self.weight_decay * layer.W
+            grad_b = layer.grad_b
 
             self.v_W[i] = self.beta * self.v_W[i] + (1 - self.beta) * grad_w
-            self.v_b[i] = self.beta * self.v_b[i] + (1 - self.beta) * layer.grad_b
+            self.v_b[i] = self.beta * self.v_b[i] + (1 - self.beta) * grad_b
             
             layer.W -= self.lr * self.v_W[i]
             layer.b -= self.lr * self.v_b[i]
@@ -65,8 +64,7 @@ class NAG:
         self._init_state(layers)
         for i, layer in enumerate(layers):
             n = layer.X.shape[0]
-            grad_w = layer.grad_w / n + self.weight_decay * layer.W
-            grad_b = layer.grad_b / n
+            grad_w = layer.grad_w + self.weight_decay * layer.W
             
             v_W_prev = self.v_W[i].copy()
             v_b_prev = self.v_b[i].copy()
@@ -99,11 +97,11 @@ class RMSProp:
         self._init_state(layers)
         for i, layer in enumerate(layers):
             n = layer.X.shape[0]
-            grad_w = layer.grad_w / n + self.weight_decay * layer.W
-            grad_b = layer.grad_b / n
+            grad_w = layer.grad_w + self.weight_decay * layer.W
+            grad_b = layer.grad_b
             
-            self.s_W[i] = self.beta * self.s_W[i] + (1 - self.beta) * grad_w ** 2
-            self.s_b[i] = self.beta * self.s_b[i] + (1 - self.beta) * layer.grad_b ** 2
+            self.s_W[i] = self.beta * self.s_W[i] + (1 - self.beta) * (grad_w ** 2)
+            self.s_b[i] = self.beta * self.s_b[i] + (1 - self.beta) * (grad_b ** 2)
             
             layer.W -= self.lr * grad_w / (np.sqrt(self.s_W[i]) + self.eps)
             layer.b -= self.lr * grad_b / (np.sqrt(self.s_b[i]) + self.eps)

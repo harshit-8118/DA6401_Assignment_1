@@ -9,7 +9,7 @@ def mse(y_true, y_pred):
     return np.mean((y_true - y_pred) ** 2)
 
 def mse_derivative(y_true, y_pred):
-    batch_size = y_true.shape[0] * y_true.shape[1]
+    batch_size = y_true.shape[0]
     return (2.0 / batch_size) * (y_pred - y_true)
 
 # CROSS-ENTROPY
@@ -22,7 +22,7 @@ def cross_entropy_derivative(y_true, y_pred):
     epsilon    = 1e-9
     batch_size = y_true.shape[0]
     y_pred     = np.clip(y_pred, epsilon, 1 - epsilon)
-    return (y_pred - y_true) / batch_size
+    return (y_pred - y_true)
 
 
 OBJECTIVE = {
