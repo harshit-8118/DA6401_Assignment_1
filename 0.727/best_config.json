@@ -1,16 +1,18 @@
 {
-  "num_neurons": [
+  "hidden_size": [
     128,
     128,
     64
   ],
+  "num_layers": 3,
   "activation": "relu",
   "weight_init": "xavier",
   "optimizer": "momentum",
   "learning_rate": 0.01,
   "weight_decay": 0.0,
   "loss": "cross_entropy",
-  "best_val_f1": 0.9818325815435327,
-  "best_epoch": 35,
+  "epochs": 50,
+  "best_epoch": 17,
+  "best_val_f1": 0.9801973057113862,
   "dataset": "mnist"
 }

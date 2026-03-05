@@ -11,7 +11,7 @@ class SGD:
 
     def update(self, layers):
         for layer in layers:
-            layer.W -= self.lr * layer.grad_W
+            layer.W -= self.lr * layer.grad_w
             layer.b -= self.lr * layer.grad_b
         
         for layer in layers:
@@ -34,7 +34,7 @@ class Momentum:
     def update(self, layers):
         self._init_state(layers)
         for i, layer in enumerate(layers):
-            self.v_W[i] = self.beta * self.v_W[i] + layer.grad_W
+            self.v_W[i] = self.beta * self.v_W[i] + layer.grad_w
             self.v_b[i] = self.beta * self.v_b[i] + layer.grad_b
             layer.W    -= self.lr * self.v_W[i]
             layer.b    -= self.lr * self.v_b[i]
@@ -69,7 +69,7 @@ class NAG:
     def update(self, layers):
         self._init_state(layers)
         for i, layer in enumerate(layers):
-            self.v_W[i] = self.beta * self.v_W[i] + layer.grad_W
+            self.v_W[i] = self.beta * self.v_W[i] + layer.grad_w
             self.v_b[i] = self.beta * self.v_b[i] + layer.grad_b
             layer.W    -= self.lr * self.v_W[i]
             layer.b    -= self.lr * self.v_b[i]
@@ -94,9 +94,9 @@ class RMSProp:
     def update(self, layers):
         self._init_state(layers)
         for i, layer in enumerate(layers):
-            self.s_W[i] = self.beta * self.s_W[i] + (1 - self.beta) * layer.grad_W ** 2
+            self.s_W[i] = self.beta * self.s_W[i] + (1 - self.beta) * layer.grad_w ** 2
             self.s_b[i] = self.beta * self.s_b[i] + (1 - self.beta) * layer.grad_b ** 2
-            layer.W    -= self.lr * layer.grad_W / (np.sqrt(self.s_W[i]) + self.eps)
+            layer.W    -= self.lr * layer.grad_w / (np.sqrt(self.s_W[i]) + self.eps)
             layer.b    -= self.lr * layer.grad_b / (np.sqrt(self.s_b[i]) + self.eps)
 
         for layer in layers:

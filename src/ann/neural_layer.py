@@ -30,8 +30,8 @@ class NeuralLayer:
         if layer_name == 'output':
             self.activation_grad = None
 
-        self.grad_W = None
         self.grad_b = None
+        self.grad_w = None   
 
         #  Dead-neuron / activation statistics 
         self.dead_neuron_counts = []   # fraction of neurons dead per batch
@@ -60,13 +60,13 @@ class NeuralLayer:
         else:
             dz = delta   
 
-        self.grad_W = self.X.T @ dz + weight_decay * self.W
-        self.grad_b = np.sum(dz, axis=0, keepdims=True)
-        clip_value = 5.0
-        self.grad_W = np.clip(self.grad_W, -clip_value, clip_value)
-        self.grad_b = np.clip(self.grad_b, -clip_value, clip_value)
-        if self.layer_name == 'hidden':
-            self.grad_history.append(np.abs(dz).mean(axis=0))
+        # Compute gradients
+        self.grad_w = self.X.T @ dz + weight_decay * self.W  # Shape: (input_size, output_size)
+        self.grad_b = np.sum(dz, axis=0, keepdims=True)      # Shape: (1, output_size)
+        
+        # if self.layer_name == 'hidden':
+        #     self.grad_history.append(np.abs(dz).mean(axis=0))
+        
         return dz @ self.W.T
 
     #  Utilities 
