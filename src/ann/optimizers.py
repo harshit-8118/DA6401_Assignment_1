@@ -1,28 +1,28 @@
-"""
-Optimizers for MLP training.
-Supported: SGD, Momentum, NAG, RMSProp
-"""
 import numpy as np
 
-
 class SGD:
-    def __init__(self, learning_rate=0.01, **kwargs):
+    def __init__(self, learning_rate=0.01, weight_decay=0.0, **kwargs):
         self.lr = learning_rate
+        self.weight_decay = weight_decay
 
     def update(self, layers):
         for layer in layers:
-            layer.W -= self.lr * layer.grad_w
-            layer.b -= self.lr * layer.grad_b
-        
-        for layer in layers:
+            n = layer.X.shape[0]
+            grad_w = layer.grad_w / n + self.weight_decay * layer.W
+            grad_b = layer.grad_b / n 
+            
+            layer.W -= self.lr * grad_w
+            layer.b -= self.lr * grad_b
+            
+            # Gradient clipping for stability
             np.clip(layer.W, -10.0, 10.0, out=layer.W)
             np.clip(layer.b, -10.0, 10.0, out=layer.b)
 
-
 class Momentum:
-    def __init__(self, learning_rate=0.01, beta=0.9, **kwargs):
+    def __init__(self, learning_rate=0.01, beta=0.9, weight_decay=0.0, **kwargs):
         self.lr   = learning_rate
         self.beta = beta
+        self.weight_decay = weight_decay
         self.v_W  = None
         self.v_b  = None
 
@@ -34,19 +34,25 @@ class Momentum:
     def update(self, layers):
         self._init_state(layers)
         for i, layer in enumerate(layers):
-            self.v_W[i] = self.beta * self.v_W[i] + layer.grad_w
-            self.v_b[i] = self.beta * self.v_b[i] + layer.grad_b
-            layer.W    -= self.lr * self.v_W[i]
-            layer.b    -= self.lr * self.v_b[i]
+            n = layer.X.shape[0]
+            # Include weight decay in the gradient calculation
+            grad_w = layer.grad_w / n + self.weight_decay * layer.W
+            grad_b = layer.grad_b / n 
 
-        for layer in layers:
+            self.v_W[i] = self.beta * self.v_W[i] + (1 - self.beta) * grad_w
+            self.v_b[i] = self.beta * self.v_b[i] + (1 - self.beta) * layer.grad_b
+            
+            layer.W -= self.lr * self.v_W[i]
+            layer.b -= self.lr * self.v_b[i]
+
             np.clip(layer.W, -10.0, 10.0, out=layer.W)
             np.clip(layer.b, -10.0, 10.0, out=layer.b)
 
 class NAG:
-    def __init__(self, learning_rate=0.01, beta=0.9, **kwargs):
+    def __init__(self, learning_rate=0.01, beta=0.9, weight_decay=0.0, **kwargs):
         self.lr   = learning_rate
         self.beta = beta
+        self.weight_decay = weight_decay
         self.v_W  = None
         self.v_b  = None
 
@@ -55,34 +61,32 @@ class NAG:
             self.v_W = [np.zeros_like(l.W) for l in layers]
             self.v_b = [np.zeros_like(l.b) for l in layers]
 
-    def lookahead(self, layers):
-        self._init_state(layers)
-        for i, layer in enumerate(layers):
-            layer.W -= self.beta * self.v_W[i]
-            layer.b -= self.beta * self.v_b[i]
-
-    def restore(self, layers):
-        for i, layer in enumerate(layers):
-            layer.W += self.beta * self.v_W[i]
-            layer.b += self.beta * self.v_b[i]
-
     def update(self, layers):
         self._init_state(layers)
         for i, layer in enumerate(layers):
-            self.v_W[i] = self.beta * self.v_W[i] + layer.grad_w
-            self.v_b[i] = self.beta * self.v_b[i] + layer.grad_b
-            layer.W    -= self.lr * self.v_W[i]
-            layer.b    -= self.lr * self.v_b[i]
+            n = layer.X.shape[0]
+            grad_w = layer.grad_w / n + self.weight_decay * layer.W
+            grad_b = layer.grad_b / n
+            
+            v_W_prev = self.v_W[i].copy()
+            v_b_prev = self.v_b[i].copy()
+            
+            self.v_W[i] = self.beta * self.v_W[i] + (1 - self.beta) * grad_w
+            self.v_b[i] = self.beta * self.v_b[i] + (1 - self.beta) * layer.grad_b
+            
+            # Nesterov update logic
+            layer.W -= self.lr * ((1 + self.beta) * self.v_W[i] - self.beta * v_W_prev)
+            layer.b -= self.lr * ((1 + self.beta) * self.v_b[i] - self.beta * v_b_prev)
 
-        for layer in layers:
             np.clip(layer.W, -10.0, 10.0, out=layer.W)
             np.clip(layer.b, -10.0, 10.0, out=layer.b)
 
 class RMSProp:
-    def __init__(self, learning_rate=0.001, beta=0.9, epsilon=1e-8, **kwargs):
+    def __init__(self, learning_rate=0.001, beta=0.9, epsilon=1e-8, weight_decay=0.0, **kwargs):
         self.lr   = learning_rate
         self.beta = beta
         self.eps  = epsilon
+        self.weight_decay = weight_decay
         self.s_W  = None
         self.s_b  = None
 
@@ -94,12 +98,16 @@ class RMSProp:
     def update(self, layers):
         self._init_state(layers)
         for i, layer in enumerate(layers):
-            self.s_W[i] = self.beta * self.s_W[i] + (1 - self.beta) * layer.grad_w ** 2
+            n = layer.X.shape[0]
+            grad_w = layer.grad_w / n + self.weight_decay * layer.W
+            grad_b = layer.grad_b / n
+            
+            self.s_W[i] = self.beta * self.s_W[i] + (1 - self.beta) * grad_w ** 2
             self.s_b[i] = self.beta * self.s_b[i] + (1 - self.beta) * layer.grad_b ** 2
-            layer.W    -= self.lr * layer.grad_w / (np.sqrt(self.s_W[i]) + self.eps)
-            layer.b    -= self.lr * layer.grad_b / (np.sqrt(self.s_b[i]) + self.eps)
+            
+            layer.W -= self.lr * grad_w / (np.sqrt(self.s_W[i]) + self.eps)
+            layer.b -= self.lr * grad_b / (np.sqrt(self.s_b[i]) + self.eps)
 
-        for layer in layers:
             np.clip(layer.W, -10.0, 10.0, out=layer.W)
             np.clip(layer.b, -10.0, 10.0, out=layer.b)
 

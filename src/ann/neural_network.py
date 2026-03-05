@@ -106,9 +106,14 @@ class NeuralNetwork:
         grad_w_list = []
         grad_b_list = []
 
-        delta = self.loss_grad(y_true=y_true, y_pred=y_pred)
+        delta = self.loss_grad(y_true, y_pred)
         for layer in reversed(self.layers):
-            delta = layer.backward(delta, weight_decay=self.weight_decay)
+            if layer.layer_name == 'output':
+                layer.grad_w = layer.X.T @ delta
+                layer.grad_b = np.sum(delta, axis=0, keepdims=True)   
+                delta = delta @ layer.W.T
+            else:
+                delta = layer.backward(delta)
             grad_w_list.append(layer.grad_w)
             grad_b_list.append(layer.grad_b)
 

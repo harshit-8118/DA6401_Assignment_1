@@ -54,15 +54,10 @@ class NeuralLayer:
         return self.A
 
     #  Backward 
-    def backward(self, delta, weight_decay=0.0):
-        if self.layer_name != 'output':
-            dz = delta * self.activation_grad(self.Z)
-        else:
-            dz = delta   
-
-        # Compute gradients
-        self.grad_w = self.X.T @ dz + weight_decay * self.W  # Shape: (input_size, output_size)
-        self.grad_b = np.sum(dz, axis=0, keepdims=True)      # Shape: (1, output_size)
+    def backward(self, delta):
+        dz = delta * self.activation_grad(self.Z)
+        self.grad_w = self.X.T @ dz
+        self.grad_b = np.sum(dz, axis=0, keepdims=True)    # Shape: (1, output_size)
         
         # if self.layer_name == 'hidden':
         #     self.grad_history.append(np.abs(dz).mean(axis=0))
