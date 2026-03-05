@@ -6,4 +6,5 @@ archived/
 models/
 logs/
 wandb/
+*.zip
 sweep_models/

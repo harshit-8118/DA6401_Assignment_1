@@ -1,12 +1,19 @@
+"""
+Inference Script
+Load a saved model and evaluate on the test set.
+CLI is identical to train.py (spec requirement).
+"""
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-import json
-from sklearn.metrics import (accuracy_score, precision_score,
-                                 recall_score, f1_score, confusion_matrix)
 
-import matplotlib
-matplotlib.use('Agg')
+import json
 import numpy as np
+from sklearn.metrics import (accuracy_score, precision_score,
+                             recall_score, f1_score, confusion_matrix)
+
+from ann.neural_network import NeuralNetwork
+from utils.data_loader import load_dataset
+from utils.arguments import parse_arguments, BEST_MODEL_NPY, BEST_MODEL_CONFIG
 
 try:
     import wandb
@@ -14,18 +21,22 @@ try:
 except ImportError:
     _WANDB_AVAILABLE = False
 
-from ann  import NeuralNetwork
-from utils import load_dataset, parse_arguments, CONFIG
 
-
-def load_model(model_path, config_path=None):
-    if config_path is None:
-        config_path = model_path.replace('.npy', '_config.json')
-    print("These are the paths: ", model_path, config_path)
-    return NeuralNetwork.load(model_path, config_path, CONFIG)
+def load_model(model_path):
+    """
+    Load trained model weights from disk.
+    Returns the weights dict — matches the spec:
+        data = np.load(model_path, allow_pickle=True).item()
+    """
+    data = np.load(model_path, allow_pickle=True).item()
+    return data
 
 
 def evaluate_model(model, X_test, y_onehot, batch_size=512):
+    """
+    Evaluate model on test data.
+    Returns dict: logits, accuracy, f1, precision, recall, confusion_matrix.
+    """
     n          = X_test.shape[0]
     all_logits = []
     all_probs  = []
@@ -33,12 +44,14 @@ def evaluate_model(model, X_test, y_onehot, batch_size=512):
         X_b = X_test[start : start + batch_size]
         all_logits.append(model.forward(X_b))
         all_probs.append(model.predict_proba(X_b))
+
     logits     = np.vstack(all_logits)
     probs      = np.vstack(all_probs)
     y_pred_lbl = np.argmax(probs,    axis=1)
     y_true_lbl = np.argmax(y_onehot, axis=1)
 
     return {
+        'logits'          : logits,
         'accuracy'        : accuracy_score(y_true_lbl, y_pred_lbl),
         'precision'       : precision_score(y_true_lbl, y_pred_lbl,
                                             average='macro', zero_division=0),
@@ -47,57 +60,61 @@ def evaluate_model(model, X_test, y_onehot, batch_size=512):
         'f1'              : f1_score(y_true_lbl, y_pred_lbl,
                                      average='macro', zero_division=0),
         'confusion_matrix': confusion_matrix(y_true_lbl, y_pred_lbl),
-        'logits'          : logits,
     }
 
 
 def main():
-    args         = parse_arguments()
-    weights_path = os.path.join(args.save_dir, args.model_save_path)
-    config_path  = None
+    """
+    Main inference function.
+    Returns dict: logits, accuracy, f1, precision, recall.
+    """
+    args = parse_arguments()
 
-    #  W&B 
-    use_wandb = (not args.no_wandb) and _WANDB_AVAILABLE
-    wandb_run = None
-    if use_wandb:
-        wandb_run = wandb.init(
+    weights_path = os.path.join(args.save_dir, args.model_save_path)
+    config_path  = os.path.join(args.save_dir, args.config_path)
+
+    # Load model
+    model = NeuralNetwork.load(weights_path, config_path)
+
+    # Load dataset
+    (_, _), (X_test, y_test) = load_dataset(args.dataset)
+
+    # Evaluate
+    results = evaluate_model(model, X_test, y_test, batch_size=args.batch_size)
+
+    print('\n  Test Set Metrics')
+    for k in ('accuracy', 'precision', 'recall', 'f1'):
+        print(f'  {k.capitalize():<12}: {results[k]:.4f}')
+
+    # Save results
+    os.makedirs(args.save_dir, exist_ok=True)
+    out = {k: (v.tolist() if hasattr(v, 'tolist') else v)
+           for k, v in results.items()}
+    out_path = os.path.join(args.save_dir, 'inference_results.json')
+    with open(out_path, 'w') as f:
+        json.dump(out, f, indent=2)
+    print(f"\n  Results saved to '{out_path}'")
+
+    # Optional W&B logging
+    if not args.no_wandb and _WANDB_AVAILABLE:
+        run = wandb.init(
             project = args.wandb_project,
             entity  = args.wandb_entity,
-            name    = args.wandb_run_name,
-            config  = {'dataset': args.dataset, 'model_path': args.model_save_path},
+            name    = 'inference',
+            config  = {'dataset': args.dataset,
+                       'model_path': args.model_save_path},
         )
+        try:
+            run.log({'test/accuracy' : results['accuracy'],
+                     'test/f1'       : results['f1'],
+                     'test/precision': results['precision'],
+                     'test/recall'   : results['recall']})
+        except Exception:
+            pass
+        run.finish()
 
-    #  Load model 
-    model = load_model(weights_path, config_path)
-
-    #  Load data 
-    (X_train, y_train), (X_test, y_test) = load_dataset(args.dataset)
-
-    #  Train metrics 
-    train_r = evaluate_model(model, X_train, y_train, args.batch_size)
-    print('\n Train Set Metrics ')
-    for k in ('accuracy', 'precision', 'recall', 'f1'):
-        print(f'  {k.capitalize():<12}: {train_r[k]:.4f}')
-
-    #  Test metrics 
-    test_r = evaluate_model(model, X_test, y_test, args.batch_size)
-    print('\n Test Set Metrics ')
-    for k in ('accuracy', 'precision', 'recall', 'f1'):
-        print(f'  {k.capitalize():<12}: {test_r[k]:.4f}')
-
-    #  Save JSON 
-    out = {k: (v.tolist() if hasattr(v, 'tolist') else v)
-           for k, v in test_r.items()}
-    os.makedirs(args.save_dir, exist_ok=True)
-    with open(os.path.join(args.save_dir, 'inference_results.json'), 'w') as f:
-        json.dump(out, f, indent=2)
-    print(f"\nResults saved to '{args.save_dir}/inference_results.json'")
-
-    if wandb_run is not None:
-        wandb_run.finish()
-
-    print("Evaluation complete!")
-    return test_r
+    print('Evaluation complete!')
+    return results
 
 
 if __name__ == '__main__':

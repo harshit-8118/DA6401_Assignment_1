@@ -5,8 +5,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
-import seaborn as sns
-sns.set_theme(style='whitegrid', palette='muted')
 
 def plot_dead_bar(results):
     palette  = ['#e74c3c', '#3498db', '#2ecc71']
@@ -42,9 +40,9 @@ def plot_dead_dist(results, x_probe):
         model = res['model']
         Z     = probe_X @ model.layers[0].W + model.layers[0].b
         A     = model.layers[0].activation(Z)
-        sns.histplot(A.flatten(), bins=60, alpha=0.55,
-                     color=palette[ci % len(palette)], label=tag,
-                     stat='density', ax=ax, kde=True)
+        ax.hist(A.flatten(), bins=60, alpha=0.55,
+                color=palette[ci % len(palette)], label=tag,
+                density=True, edgecolor='black', linewidth=0.5)
 
     ax.axvline(0, color='k', linestyle='--', linewidth=1.2, label='zero')
     ax.set_xlabel('Activation Value')
@@ -140,8 +138,10 @@ def creative_failure_viz(X, y_true, y_pred, probs, confidences, cm, class_names)
     sorted_pairs = sorted(zip(per_class_acc, class_names))
     sorted_acc   = [p[0] for p in sorted_pairs]
     sorted_names = [p[1] for p in sorted_pairs]
+    cmap = plt.cm.RdYlGn
+    colors = [cmap(i / max(n_classes - 1, 1)) for i in range(n_classes)]
     bars = ax_a.barh(sorted_names, sorted_acc,
-                     color=sns.color_palette('RdYlGn', n_colors=n_classes))
+                     color=colors)
     ax_a.set_xlim(0, 1)
     ax_a.set_xlabel('Accuracy')
     ax_a.set_title('Per-class Accuracy')
@@ -178,10 +178,10 @@ def creative_failure_viz(X, y_true, y_pred, probs, confidences, cm, class_names)
     correct_c = confidences[y_pred == y_true]
     wrong_c   = confidences[y_pred != y_true]
     bins      = np.linspace(0, 1, 30)
-    sns.histplot(correct_c, bins=bins, alpha=0.65, color='#2ecc71',
-                 label=f'Correct (n={len(correct_c)})', stat='density', ax=ax_c, kde=True)
-    sns.histplot(wrong_c,   bins=bins, alpha=0.65, color='#e74c3c',
-                 label=f'Wrong  (n={len(wrong_c)})',   stat='density', ax=ax_c, kde=True)
+    ax_c.hist(correct_c, bins=bins, alpha=0.65, color='#2ecc71',
+              label=f'Correct (n={len(correct_c)})', density=True, edgecolor='black', linewidth=0.5)
+    ax_c.hist(wrong_c,   bins=bins, alpha=0.65, color='#e74c3c',
+              label=f'Wrong  (n={len(wrong_c)})',   density=True, edgecolor='black', linewidth=0.5)
     ax_c.set_xlabel('Predicted Confidence')
     ax_c.set_ylabel('Density')
     ax_c.set_title('Confidence: Correct vs Wrong')
@@ -190,7 +190,8 @@ def creative_failure_viz(X, y_true, y_pred, probs, confidences, cm, class_names)
     return fig
 
 def plot_symmetry(history, n_neurons_to_track=5, max_steps=50):
-    palette = sns.color_palette('tab10', n_colors=n_neurons_to_track)
+    cmap = plt.cm.tab10
+    palette = [cmap(i % 10) for i in range(n_neurons_to_track)]
     titles  = {
         'zeros' : 'Zeros Init — all neurons identical (symmetry NOT broken)',
         'xavier': 'Xavier Init — neurons diverge (symmetry broken)',
