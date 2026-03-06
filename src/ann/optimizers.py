@@ -1,3 +1,9 @@
+"""
+CORRECTED optimizers.py
+
+CRITICAL CHANGE: REMOVED all weight clipping!
+"""
+
 import numpy as np
 
 class SGD:
@@ -13,9 +19,9 @@ class SGD:
             layer.W -= self.lr * grad_w
             layer.b -= self.lr * grad_b
             
-            # Gradient clipping for stability
-            np.clip(layer.W, -10.0, 10.0, out=layer.W)
-            np.clip(layer.b, -10.0, 10.0, out=layer.b)
+            # REMOVED: No gradient clipping
+            # np.clip(layer.W, -10.0, 10.0, out=layer.W)
+            # np.clip(layer.b, -10.0, 10.0, out=layer.b)
 
 class Momentum:
     def __init__(self, learning_rate=0.01, beta=0.9, weight_decay=0.0, **kwargs):
@@ -33,8 +39,6 @@ class Momentum:
     def update(self, layers):
         self._init_state(layers)
         for i, layer in enumerate(layers):
-            n = layer.X.shape[0]
-            # Include weight decay in the gradient calculation
             grad_w = layer.grad_w + self.weight_decay * layer.W
             grad_b = layer.grad_b
 
@@ -44,8 +48,9 @@ class Momentum:
             layer.W -= self.lr * self.v_W[i]
             layer.b -= self.lr * self.v_b[i]
 
-            np.clip(layer.W, -10.0, 10.0, out=layer.W)
-            np.clip(layer.b, -10.0, 10.0, out=layer.b)
+            # REMOVED: No gradient clipping
+            # np.clip(layer.W, -10.0, 10.0, out=layer.W)
+            # np.clip(layer.b, -10.0, 10.0, out=layer.b)
 
 class NAG:
     def __init__(self, learning_rate=0.01, beta=0.9, weight_decay=0.0, **kwargs):
@@ -63,7 +68,6 @@ class NAG:
     def update(self, layers):
         self._init_state(layers)
         for i, layer in enumerate(layers):
-            n = layer.X.shape[0]
             grad_w = layer.grad_w + self.weight_decay * layer.W
             
             v_W_prev = self.v_W[i].copy()
@@ -76,8 +80,9 @@ class NAG:
             layer.W -= self.lr * ((1 + self.beta) * self.v_W[i] - self.beta * v_W_prev)
             layer.b -= self.lr * ((1 + self.beta) * self.v_b[i] - self.beta * v_b_prev)
 
-            np.clip(layer.W, -10.0, 10.0, out=layer.W)
-            np.clip(layer.b, -10.0, 10.0, out=layer.b)
+            # REMOVED: No gradient clipping
+            # np.clip(layer.W, -10.0, 10.0, out=layer.W)
+            # np.clip(layer.b, -10.0, 10.0, out=layer.b)
 
 class RMSProp:
     def __init__(self, learning_rate=0.001, beta=0.9, epsilon=1e-8, weight_decay=0.0, **kwargs):
@@ -96,7 +101,6 @@ class RMSProp:
     def update(self, layers):
         self._init_state(layers)
         for i, layer in enumerate(layers):
-            n = layer.X.shape[0]
             grad_w = layer.grad_w + self.weight_decay * layer.W
             grad_b = layer.grad_b
             
@@ -106,8 +110,9 @@ class RMSProp:
             layer.W -= self.lr * grad_w / (np.sqrt(self.s_W[i]) + self.eps)
             layer.b -= self.lr * grad_b / (np.sqrt(self.s_b[i]) + self.eps)
 
-            np.clip(layer.W, -10.0, 10.0, out=layer.W)
-            np.clip(layer.b, -10.0, 10.0, out=layer.b)
+            # REMOVED: No gradient clipping
+            # np.clip(layer.W, -10.0, 10.0, out=layer.W)
+            # np.clip(layer.b, -10.0, 10.0, out=layer.b)
 
 
 OPTIMIZERS = {

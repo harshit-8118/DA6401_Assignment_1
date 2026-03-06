@@ -12,7 +12,7 @@
   "weight_decay": 0.0,
   "loss": "cross_entropy",
   "epochs": 50,
-  "best_epoch": 17,
-  "best_val_f1": 0.9801973057113862,
+  "best_epoch": 36,
+  "best_val_f1": 0.976556819022782,
   "dataset": "mnist"
 }

@@ -95,7 +95,7 @@ class NeuralNetwork:
         return np.argmax(self.predict_proba(X), axis=1)
 
     #  Backward 
-    def backward(self, y_true, y_pred):
+    def backward(self, y_true, y_pred_logits):
         """
         Backward propagation to compute gradients.
         Returns two numpy arrays: grad_w, grad_b as object arrays.
@@ -103,18 +103,25 @@ class NeuralNetwork:
         grad_w[0] = gradient for output layer weights (shape: hidden_size, 10)
         grad_w[1] = gradient for first hidden layer weights (shape: 784, hidden_size)
         """
-        if self.cli_args.loss == 'cross_entropy':
-            y_pred = ACTIVATIONS['softmax'][0](y_pred)
+        m = y_pred_logits.shape[0]
+        n = y_pred_logits.shape[1]
 
+        y_true = np.array(y_true)
+        if y_true.ndim == 1 or (y_true.ndim == 2 and y_true.shape[1] == 1):
+            y_int = y_true.flatten().astype(int)
+            y_onehot = np.zeros((m, n))
+            y_onehot[np.arange(m), y_int] = 1.0
+        else:
+            y_onehot = y_true
         grad_w_list = []
         grad_b_list = []
 
-        delta = self.loss_grad(y_true, y_pred)
+        delta = self.loss_grad(y_onehot, y_pred_logits)
         for layer in reversed(self.layers):
             if layer.layer_name == 'output':
                 m = layer.X.shape[0]
-                layer.grad_w = (layer.X.T @ delta) / m
-                layer.grad_b = np.sum(delta, axis=0, keepdims=True) / m
+                layer.grad_w = (layer.X.T @ delta)
+                layer.grad_b = np.sum(delta, axis=0, keepdims=True)
                 delta = delta @ layer.W.T
             else:
                 delta = layer.backward(delta)
@@ -183,7 +190,7 @@ class NeuralNetwork:
                 y_b = y_shuf[start : start + batch_size]
 
                 logits = self.forward(X_b)
-                self.backward(y_true=y_b, y_pred=logits)
+                self.backward(y_true=y_b, y_pred_logits=logits)
 
                 if global_step < track_grad_steps and self.layers[0].grad_w is not None:
                     per_neuron = np.linalg.norm(self.layers[0].grad_w, axis=0)
