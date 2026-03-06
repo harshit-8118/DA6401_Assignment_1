@@ -103,6 +103,9 @@ class NeuralNetwork:
         grad_w[0] = gradient for output layer weights (shape: hidden_size, 10)
         grad_w[1] = gradient for first hidden layer weights (shape: 784, hidden_size)
         """
+        if self.cli_args.loss == 'cross_entropy':
+            y_pred = ACTIVATIONS['softmax'][0](y_pred)
+
         grad_w_list = []
         grad_b_list = []
 
@@ -179,18 +182,8 @@ class NeuralNetwork:
                 X_b = X_shuf[start : start + batch_size]
                 y_b = y_shuf[start : start + batch_size]
 
-                if self.is_nag:
-                    self.optimizer.lookahead(self.layers)
-
                 logits = self.forward(X_b)
-                if self.cli_args.loss == 'mse':
-                    self.backward(y_true=y_b, y_pred=logits)
-                else:
-                    probs = self.predict_proba(X_b)
-                    self.backward(y_true=y_b, y_pred=probs)
-
-                if self.is_nag:
-                    self.optimizer.restore(self.layers)
+                self.backward(y_true=y_b, y_pred=logits)
 
                 if global_step < track_grad_steps and self.layers[0].grad_w is not None:
                     per_neuron = np.linalg.norm(self.layers[0].grad_w, axis=0)
@@ -214,6 +207,11 @@ class NeuralNetwork:
             print(f"  [{epoch+1}/{epochs}]  "
                   f"Train Loss:{train_m['loss']:.4f} Acc:{train_m['accuracy']:.4f}  |  "
                   f"Val Loss:{val_m['loss']:.4f} Acc:{val_m['accuracy']:.4f} F1:{val_m['f1']:.4f}")
+
+            if val_m['f1'] > self._best_val_f1:
+                self._best_val_f1 = val_m['f1']
+                self._best_epoch  = epoch + 1
+                self.save_model(save_dir)
 
             if wandb_run is not None:
                 log_dict = {
@@ -240,11 +238,6 @@ class NeuralNetwork:
                     wandb_run.log(log_dict)
                 except Exception:
                     pass
-
-            if val_m['f1'] > self._best_val_f1:
-                self._best_val_f1 = val_m['f1']
-                self._best_epoch  = epoch + 1
-                self.save_model(save_dir)
 
         print(f"\n  Best val F1={self._best_val_f1:.4f} at epoch {self._best_epoch}\n")
         return history

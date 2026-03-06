@@ -1,14 +1,6 @@
 """
 utils/wandb_report.py
 Experiment helpers for W&B report sections 2.1 – 2.10.
-
-Contract
---------
-* train.py creates ONE wandb run per section and passes it as wandb_run.
-* Sub-runs (per optimizer / activation / init) are created here with
-  _begin_sub_run() and finished with _finish().
-* After sub-run loops, _restore_outer() re-opens the outer run by id.
-* save_and_log() never raises.
 """
 
 import argparse
@@ -20,7 +12,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utils.data_loader import load_dataset
+from utils.data_loader import load_dataset, train_val_split
 from utils.plots_fig import (
     plot_dead_bar, plot_dead_dist, plot_grad_comparison,
     plot_loss_comparison, plot_val_accuracy,
@@ -106,7 +98,7 @@ def _finish(run):
         pass
 
 
-def _restore_outer(wandb_run):
+def restore_outer(wandb_run):
     """Re-open the outer run after sub-run loops may have invalidated it."""
     if wandb_run is None or not _WANDB_AVAILABLE:
         return wandb_run
@@ -164,7 +156,7 @@ def log_5_samples_from_each_class(X, y, image_shape=(28, 28),
 
 # ── 2.2 sweep ────────────────────────────────────────────────────────────────
 
-def run_sweep(args, CONFIG, x_train, y_train, x_val, y_val, x_test, y_test,
+def run_sweep(args, CONFIG, x_train, y_train, x_test, y_test,
               NeuralNetwork=None):
     """
     W&B Bayesian sweep — 100 runs.
@@ -180,16 +172,16 @@ def run_sweep(args, CONFIG, x_train, y_train, x_val, y_val, x_test, y_test,
         'method': 'bayes',
         'metric': {'name': 'val/f1', 'goal': 'maximize'},
         'parameters': {
-            'epochs'       : {'values': [10, 20, 30]},
+            'epochs'       : {'values': [10, 20, 30, 50]},
             'batch_size'   : {'values': [32, 64, 128]},
             'learning_rate': {'values': [0.0001, 0.001, 0.005, 0.01]},
-            'optimizer'    : {'values': ['sgd', 'momentum', 'nag', 'rmsprop']},
+            'optimizer'    : {'values': ['momentum', 'nag', 'xavier', 'rmsprop']},
             'hidden_size'  : {'values': [[64, 64], [128, 128],
                                          [128, 128, 64], [128, 128, 128]]},
             'activation'   : {'values': ['relu', 'tanh', 'sigmoid']},
             'weight_init'  : {'values': ['random', 'xavier']},
-            'weight_decay' : {'values': [0.0, 0.0005]},
-            'loss'         : {'values': ['cross_entropy']},
+            'weight_decay' : {'values': [0.0, 0.001, 0.0005]},
+            'loss'         : {'values': ['cross_entropy', 'mse']},
         },
     }
 
@@ -235,8 +227,6 @@ def run_sweep(args, CONFIG, x_train, y_train, x_val, y_val, x_test, y_test,
             run.log({
                 'test/accuracy' : test_m['accuracy'],
                 'test/f1'       : test_m['f1'],
-                'test/precision': test_m['precision'],
-                'test/recall'   : test_m['recall'],
                 'test/loss'     : test_m['loss'],
             })
         except Exception:
@@ -279,7 +269,7 @@ def optimizer_showdown(args, CONFIG, x_train, y_train,
         summary[opt] = model._best_val_f1
         _finish(sub)
 
-    wandb_run = _restore_outer(wandb_run)
+    wandb_run = restore_outer(wandb_run)
     fig, ax   = plt.subplots(figsize=(9, 4))
     vals      = [summary[o] for o in OPTS]
     # Use matplotlib tab10 colors or a custom muted palette
@@ -334,7 +324,7 @@ def vanishing_grad_analysis(args, CONFIG, x_train, y_train,
             summary[depth_name][act] = model.layer_gradient_norms()
             _finish(sub)
 
-    wandb_run = _restore_outer(wandb_run)
+    wandb_run = restore_outer(wandb_run)
     palette   = {'sigmoid': '#e74c3c', 'relu': '#2ecc71'}
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
     for ax, (depth_name, neurons) in zip(axes, CONFIGS.items()):
@@ -430,7 +420,7 @@ def dead_neuron_investigation(args, CONFIG, x_train, y_train,
         }
         _finish(sub)
 
-    wandb_run = _restore_outer(wandb_run)
+    wandb_run = restore_outer(wandb_run)
     for fig, fname, key, cap in [
         (plot_dead_bar(results),   '2.5_dead_neuron_bar.png',
          '2.5/dead_neuron_bar',    'Dead neuron fraction per layer'),
@@ -490,7 +480,7 @@ def loss_function_comparison(args, CONFIG, x_train, y_train,
         }
         _finish(sub)
 
-    wandb_run = _restore_outer(wandb_run)
+    wandb_run = restore_outer(wandb_run)
     fig = plot_loss_comparison(history)
     save_and_log(fig, '2.6_loss_comparison.png', args.save_dir,
                  '2.6/loss_comparison', wandb_run,
@@ -554,7 +544,7 @@ def global_performance_overlay_from_wandb(args, wandb_run=None,
     for r in api.runs(path):
         s  = r.summary._json_dict
         ta = s.get('train/accuracy')
-        va = s.get('val/accuracy')
+        va = s.get('test/accuracy')
         if ta is not None and va is not None:
             records.append({'name': r.name,
                             'train_acc': float(ta), 'test_acc': float(va)})
@@ -658,7 +648,7 @@ def weight_init_symmetry(args, CONFIG, x_train, y_train,
                     pass
         _finish(sub)
 
-    wandb_run = _restore_outer(wandb_run)
+    wandb_run = restore_outer(wandb_run)
     fig = plot_symmetry(history, n_neurons_to_track, track_grad_steps)
     save_and_log(fig, '2.9_weight_init_symmetry.png', args.save_dir,
                  '2.9/weight_init_symmetry', wandb_run)
@@ -718,7 +708,7 @@ def fashion_mnist_transfer(args, CONFIG, x_train, y_train, x_test, y_test,
         results.append({'name': name, 'test_acc': test_m['accuracy'],
                         'test_f1': test_m['f1']})
 
-    wandb_run = _restore_outer(wandb_run)
+    wandb_run = restore_outer(wandb_run)
     if wandb_run is not None and _WANDB_AVAILABLE:
         for r in results:
             try:

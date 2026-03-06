@@ -135,12 +135,12 @@ def main():
     print(f'{"="*60}\n')
 
     # Load data for all other experiments
-    dataset_name = ('fashion_mnist'
-                    if args.experiment == 'fashion' else args.dataset)
+    dataset_name = ('fashion_mnist' if args.experiment == 'fashion' else args.dataset)
     (x_train, y_train), (x_test, y_test) = load_dataset(dataset_name)
     exp = args.experiment
     
-    if True:
+    # 2.0 — train (saves best_model.npy + best_config.json)
+    if args.experiment in ('train', 'all'):
         run = make_wandb_run(args, '2.0_train', '2.0_train')
         run_training(args, x_train, y_train, x_test, y_test, run)
         _finish(run)
@@ -150,12 +150,9 @@ def main():
         if args.no_wandb or not _WANDB_AVAILABLE:
             print('W&B sweep requires wandb. Remove --no_wandb.')
             return
-        (x_train, y_train), (x_test, y_test) = load_dataset(args.dataset)
         run_sweep(args, CONFIG, x_train, y_train, x_test, y_test,
                   NeuralNetwork=NeuralNetwork)
         return
-
-    # 2.0 — train (saves best_model.npy + best_config.json)
 
     # 2.1 — sample visualisation
     if exp in ('visual', 'all'):
