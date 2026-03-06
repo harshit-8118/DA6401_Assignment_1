@@ -24,18 +24,16 @@ Assignment-1
 │    │   ├── neural_layer.py           # Layer implementation (forward/backward)
 │    │   ├── activations.py            # ReLU, Tanh, Sigmoid, Softmax
 │    │   ├── optimizers.py             # SGD, Momentum, NAG, RMSProp
-│    │   └── objective_functions.py    # MSE, Cross-Entropy loss
-│    │   └── __init__.py               # Exports all utilities
+│    │   └── objective_functions.py    # MSE, Cross-Entropy loss 
 │    ├── utils/
 │    │   ├── arguments.py              # CLI argument parser & CONFIG
 │    │   ├── data_loader.py            # MNIST & Fashion-MNIST Loading | Scaling | Splitting | Initializing weights
 │    │   ├── plots_fig.py              # Visualization functions
-│    │   ├── wandb_report.py           # W&B logging
-│    │   └── __init__.py               # Exports all utilities
+│    │   ├── wandb_report.py           # W&B logging 
 │    ├── train.py                      # Main training script
 │    ├── inference.py                  # Model testing script
-│    ├── best_model.npy               # Saved weights
-│    └── best_model_config.json       # Model configuration
+│    ├── best_model.npy                # Saved weights
+│    └── best_model.json               # Model configuration
 └── README.md
 └── requirements.txt
 ```
@@ -63,7 +61,7 @@ pip install -r requirements.txt
 ```bash
 python src/train.py --dataset mnist --epochs 50 --batch_size 32 \
   --optimizer momentum --learning_rate 0.01 \
-  --activation relu --num_neurons 128 128 64 \
+  --activation relu --hidden_size 128 128 64 \
   --weight_init xavier --experiment train
 ```
 
@@ -97,7 +95,7 @@ model = NeuralNetwork(CONFIG, cli_args)
 ```
 - `CONFIG`: Dict with `val_split`, `beta` (momentum), `epsilon` (RMSProp)
 - `cli_args`: Arguments from command line (learning_rate, optimizer, activation, etc.)
-- Builds layers automatically from `num_neurons` argument
+- Builds layers automatically from `hidden_size` argument
 - Initializes optimizer based on selection
 
 **Key Methods:**
@@ -222,6 +220,13 @@ For each epoch:
 
 ---
 
+- **wandb_report.py**: Contains W&B logging & visualization functions (too many for brevity)
+- **plots_fig.py**: Plotting utilities for experiments
+- **activations.py**: Just activation functions (ReLU, Tanh, Sigmoid, Softmax)
+- **optimizers.py**: Just optimizer update rules (see parameter descriptions above)
+- **objective_functions.py**: Just loss functions (MSE, Cross-Entropy)
+---
+
 ## Command-Line Arguments
 
 | Argument | Default | Options |
@@ -233,14 +238,16 @@ For each epoch:
 | `-o, --optimizer` | momentum | sgd, momentum, nag, rmsprop |
 | `-a, --activation` | relu | relu, tanh, sigmoid |
 | `-l, --loss` | cross_entropy | mse, cross_entropy |
-| `-sz, --num_neurons` | 128 128 64 | list of ints |
-| `-wi, --weight_init` | xavier | random, xavier, zeros |
+| `-nhl, --num_layers` | 3 | # layers |
+| `-sz, --hidden_size` | 128 128 64 | list of ints |
+| `-w_i, --weight_init` | xavier | random, xavier, zeros |
 | `-wd, --weight_decay` | 0.0 | float |
+| `-w_p, --wandb_project` | Project_name | float |
 | `--experiment` | train | train, visual, sweep, optimizer, ... |
 | `--save_dir` | models | str (folder path) |
 | `--no_wandb` | False | (skip W&B logging) |
 | `--seed` | 42 | int |
-
+and some others...
 ---
 
 ## Example Workflows
@@ -277,33 +284,10 @@ python src/train.py --dataset mnist --experiment sweep
 
 ---
 
-## Key Implementation Notes
-
-### Gradient Clipping
-Gradients are clipped to ±5 to prevent explosion.
-
-### Early Stopping
-Saves model when validation F1 improves (best epoch automatically selected).
-
-### NAG (Nesterov Accelerated Gradient)
-Includes lookahead + restore steps in training loop.
-
 ### Weight Initialization Impact
 - `random`: Often leads to vanishing gradients
 - `xavier`: Balances scale relative to input/output size (recommended)
 - `zeros`: Only for bias initialization
-
----
-
-## What's NOT in This README
-
-- **wandb_report.py**: Contains W&B logging & visualization functions (too many for brevity)
-- **plots_fig.py**: Plotting utilities for experiments
-- **activations.py**: Just activation functions (ReLU, Tanh, Sigmoid, Softmax)
-- **optimizers.py**: Just optimizer update rules (see parameter descriptions above)
-- **objective_functions.py**: Just loss functions (MSE, Cross-Entropy)
-
-These are straightforward and well-documented in their respective files.
 
 ---
 
@@ -325,5 +309,5 @@ These are straightforward and well-documented in their respective files.
 - **NeuralLayer**: Individual layer with forward/backward
 - **train.py**: 10 different experiments + model training
 - **inference.py**: Load & evaluate on test set
-- **Key hyperparameters**: optimizer, learning_rate, activation, num_neurons, weight_init
+- **Key hyperparameters**: optimizer, learning_rate, activation, hidden_size, weight_init
 - **Save/Load**: Automatic via `.save_model()` and `NeuralNetwork.load()`
