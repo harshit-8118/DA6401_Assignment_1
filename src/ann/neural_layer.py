@@ -25,7 +25,7 @@ class NeuralLayer:
 
         self.layer_name = layer_name
 
-        self.activation,      self.activation_grad = ACTIVATIONS[activation]
+        self.activation, self.activation_grad = ACTIVATIONS[activation]
         self.activation_name = activation
         if layer_name == 'output':
             self.activation_grad = None
@@ -34,9 +34,9 @@ class NeuralLayer:
         self.grad_w = None   
 
         #  Dead-neuron / activation statistics 
-        self.dead_neuron_counts = []   # fraction of neurons dead per batch
+        self.dead_neuron_counts = []  # fraction of neurons dead per batch
         self.activation_history = []  # mean activation per neuron (for plotting)
-        self.grad_history       = []
+        self.grad_history = []
         
     #  Forward 
     def forward(self, X):
@@ -44,7 +44,7 @@ class NeuralLayer:
         self.Z = X @ self.W + self.b
         self.A = self.activation(self.Z)
 
-        # Track dead neurons (only for ReLU hidden layers)
+        # Track dead neurons only for ReLU hidden layers
         if self.activation_name == 'relu' and self.layer_name == 'hidden':
             dead_fraction = np.mean(self.A == 0)
             self.dead_neuron_counts.append(float(dead_fraction))
@@ -60,8 +60,8 @@ class NeuralLayer:
         self.grad_w = (self.X.T @ dz) 
         self.grad_b = np.sum(dz, axis=0, keepdims=True)   # Shape: (1, output_size)
         
-        # if self.layer_name == 'hidden':
-        #     self.grad_history.append(np.abs(dz).mean(axis=0))
+        if self.layer_name == 'hidden':
+            self.grad_history.append(np.abs(dz).mean(axis=0))
         
         return dz @ self.W.T
 
@@ -69,7 +69,6 @@ class NeuralLayer:
     def dead_neuron_fraction(self, X_probe):
         Z = X_probe @ self.W + self.b
         A = self.activation(Z)
-        # A neuron is dead if it fires 0 for ALL samples
         dead = np.all(A == 0, axis=0)
         return float(np.mean(dead)), dead
 
@@ -77,12 +76,12 @@ class NeuralLayer:
         Z = X_probe @ self.W + self.b
         A = self.activation(Z)
         return {
-            'mean'        : A.mean(axis=0),
-            'std'         : A.std(axis=0),
+            'mean' : A.mean(axis=0),
+            'std' : A.std(axis=0),
             'percent_zero': (A == 0).mean(axis=0) * 100,
-            'min'         : A.min(axis=0),
-            'max'         : A.max(axis=0),
-            'raw'         : A,
+            'min' : A.min(axis=0),
+            'max' : A.max(axis=0),
+            'raw' : A,
         }
 
     def gradient_flow_summary(self):

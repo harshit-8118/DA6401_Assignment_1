@@ -25,7 +25,7 @@ class SGD:
 
 class Momentum:
     def __init__(self, learning_rate=0.01, beta=0.9, weight_decay=0.0, **kwargs):
-        self.lr   = learning_rate
+        self.lr = learning_rate
         self.beta = beta
         self.weight_decay = weight_decay
         self.v_W  = None
@@ -54,7 +54,7 @@ class Momentum:
 
 class NAG:
     def __init__(self, learning_rate=0.01, beta=0.9, weight_decay=0.0, **kwargs):
-        self.lr   = learning_rate
+        self.lr = learning_rate
         self.beta = beta
         self.weight_decay = weight_decay
         self.v_W  = None
@@ -86,7 +86,7 @@ class NAG:
 
 class RMSProp:
     def __init__(self, learning_rate=0.001, beta=0.9, epsilon=1e-8, weight_decay=0.0, **kwargs):
-        self.lr   = learning_rate
+        self.lr = learning_rate
         self.beta = beta
         self.eps  = epsilon
         self.weight_decay = weight_decay
@@ -116,8 +116,8 @@ class RMSProp:
 
 
 OPTIMIZERS = {
-    'sgd':      SGD,
+    'sgd': SGD,
     'momentum': Momentum,
-    'nag':      NAG,
-    'rmsprop':  RMSProp,
+    'nag': NAG,
+    'rmsprop': RMSProp,
 }

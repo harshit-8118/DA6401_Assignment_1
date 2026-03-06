@@ -32,7 +32,7 @@ def plot_dead_bar(results):
     return fig
 
 def plot_dead_dist(results, x_probe):
-    palette = ['#e74c3c', '#3498db', '#2ecc71']   # fix: was only 2 colors
+    palette = ['#e74c3c', '#3498db', '#2ecc71']   
     probe_X = x_probe[:500]
     fig, ax = plt.subplots(figsize=(8, 4))
 

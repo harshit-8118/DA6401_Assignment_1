@@ -5,8 +5,6 @@ Entry point for training the MLP with command-line arguments.
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
-import json
-import shutil
 import numpy as np
 
 from ann.neural_network import NeuralNetwork
@@ -26,8 +24,7 @@ except ImportError:
     _WANDB_AVAILABLE = False
 
 
-# ── W&B helpers ───────────────────────────────────────────────────────────────
-
+#  W&B helpers 
 def make_wandb_run(args, name, group, extra_cfg=None):
     if args.no_wandb or not _WANDB_AVAILABLE:
         return None
@@ -55,7 +52,7 @@ def make_wandb_run(args, name, group, extra_cfg=None):
     )
 
 
-def _finish(run):
+def is_finish(run):
     if run is None:
         return
     try:
@@ -64,8 +61,7 @@ def _finish(run):
         pass
 
 
-# ── Best-model helpers ────────────────────────────────────────────────────────
-
+#  Best-model helpers 
 def best_model_paths(args):
     return (os.path.join(args.save_dir, BEST_MODEL_NPY),
             os.path.join(args.save_dir, BEST_MODEL_CONFIG))
@@ -120,8 +116,7 @@ def load_best_model(args):
     return NeuralNetwork.load(weights_path, config_path)
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
-
+#  Main 
 def main():
     args = parse_arguments()
     np.random.seed(args.seed)
@@ -134,18 +129,18 @@ def main():
     print(f'  Project    : {args.wandb_project}')
     print(f'{"="*60}\n')
 
-    # Load data for all other experiments
+    # Load data 
     dataset_name = ('fashion_mnist' if args.experiment == 'fashion' else args.dataset)
     (x_train, y_train), (x_test, y_test) = load_dataset(dataset_name)
     exp = args.experiment
     
-    # 2.0 — train (saves best_model.npy + best_config.json)
+    # 2.0 — train saves best_model.npy & best_config.json
     if args.experiment in ('train', 'all'):
         run = make_wandb_run(args, '2.0_train', '2.0_train')
         run_training(args, x_train, y_train, x_test, y_test, run)
-        _finish(run)
+        is_finish(run)
 
-    # Sweep is self-contained — load data and return immediately
+    # Sweep self-contained | load data and return immediately
     if args.experiment == 'sweep':
         if args.no_wandb or not _WANDB_AVAILABLE:
             print('W&B sweep requires wandb. Remove --no_wandb.')
@@ -159,37 +154,33 @@ def main():
         run = make_wandb_run(args, '2.1_samples', '2.1_samples')
         log_5_samples_from_each_class(
             x_train, y_train, save_dir=args.save_dir, wandb_run=run)
-        _finish(run)
+        is_finish(run)
 
     # 2.3 — optimizer showdown
     if exp in ('optimizer', 'all'):
         run = make_wandb_run(args, '2.3_optimizer_showdown',
                              '2.3_optimizer_showdown')
-        run = optimizer_showdown(args, CONFIG, x_train, y_train,
-                                 NeuralNetwork=NeuralNetwork, wandb_run=run)
-        _finish(run)
+        run = optimizer_showdown(args, CONFIG, x_train, y_train, NeuralNetwork=NeuralNetwork, wandb_run=run)
+        is_finish(run)
 
     # 2.4 — vanishing gradient
     if exp in ('vanishing', 'all'):
         run = make_wandb_run(args, '2.4_vanishing_gradient',
                              '2.4_vanishing_gradient')
-        run = vanishing_grad_analysis(args, CONFIG, x_train, y_train,
-                                      NeuralNetwork=NeuralNetwork, wandb_run=run)
-        _finish(run)
+        run = vanishing_grad_analysis(args, CONFIG, x_train, y_train, NeuralNetwork=NeuralNetwork, wandb_run=run)
+        is_finish(run)
 
     # 2.5 — dead neurons
     if exp in ('dead', 'all'):
         run = make_wandb_run(args, '2.5_dead_neurons', '2.5_dead_neurons')
-        run, _ = dead_neuron_investigation(args, CONFIG, x_train, y_train,
-                                           NeuralNetwork=NeuralNetwork, wandb_run=run)
-        _finish(run)
+        run, _ = dead_neuron_investigation(args, CONFIG, x_train, y_train, NeuralNetwork=NeuralNetwork, wandb_run=run)
+        is_finish(run)
 
     # 2.6 — loss comparison
     if exp in ('loss', 'all'):
         run = make_wandb_run(args, '2.6_loss_comparison', '2.6_loss_comparison')
-        run, _ = loss_function_comparison(args, CONFIG, x_train, y_train,
-                                          NeuralNetwork=NeuralNetwork, wandb_run=run)
-        _finish(run)
+        run, _ = loss_function_comparison(args, CONFIG, x_train, y_train, NeuralNetwork=NeuralNetwork, wandb_run=run)
+        is_finish(run)
 
     # 2.7 — global overlay (needs prior sweep runs in W&B)
     if exp in ('overlay', 'all'):
@@ -198,7 +189,7 @@ def main():
         else:
             run = make_wandb_run(args, '2.7_global_overlay', '2.7_global_overlay')
             global_performance_overlay_from_wandb(args, wandb_run=run)
-            _finish(run)
+            is_finish(run)
 
     # 2.8 — error analysis (loads best_model.npy)
     if exp in ('error', 'all'):
@@ -210,31 +201,23 @@ def main():
                 return
         else:
             run = make_wandb_run(args, '2.8_error_analysis', '2.8_error_analysis')
-            error_analysis(model, x_test, y_test,
-                           dataset_name=args.dataset,
-                           save_dir=args.save_dir, wandb_run=run)
-            _finish(run)
+            error_analysis(model, x_test, y_test, dataset_name=args.dataset, save_dir=args.save_dir, wandb_run=run)
+            is_finish(run)
 
     # 2.9 — weight init symmetry
     if exp in ('symmetry', 'all'):
         run = make_wandb_run(args, '2.9_weight_init_symmetry',
                              '2.9_weight_init_symmetry')
-        run, _ = weight_init_symmetry(args, CONFIG, x_train, y_train,
-                                      NeuralNetwork=NeuralNetwork, wandb_run=run,
-                                      n_neurons_to_track=5, track_grad_steps=50)
-        _finish(run)
+        run, _ = weight_init_symmetry(args, CONFIG, x_train, y_train, NeuralNetwork=NeuralNetwork, wandb_run=run, n_neurons_to_track=5, track_grad_steps=50)
+        is_finish(run)
 
     # 2.10 — fashion-MNIST transfer
     if exp in ('fashion', 'all'):
         (x_f_train, y_f_train), (x_f_test, y_f_test) = load_dataset('fashion_mnist')
         run = make_wandb_run(args, '2.10_fashion_transfer',
                              '2.10_fashion_transfer')
-        run, _ = fashion_mnist_transfer(args, CONFIG,
-                                        x_f_train, y_f_train,
-                                        x_f_test, y_f_test,
-                                        NeuralNetwork=NeuralNetwork, wandb_run=run)
-        _finish(run)
-
+        run, _ = fashion_mnist_transfer(args, CONFIG, x_f_train, y_f_train, x_f_test, y_f_test, NeuralNetwork=NeuralNetwork, wandb_run=run)
+        is_finish(run)
 
 if __name__ == '__main__':
     main()

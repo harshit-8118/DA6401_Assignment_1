@@ -4,7 +4,6 @@ Handles MNIST and Fashion-MNIST datasets
 """
 import numpy as np
 
-
 def initialize_weights(weight_init, input_size, output_size):
     """Kept here for backward-compat imports."""
     if weight_init == 'zeros':
@@ -19,17 +18,7 @@ def initialize_weights(weight_init, input_size, output_size):
 def load_dataset(dataset: str):
     """
     Load dataset and return train / test splits.
-
-    Returns
-    -------
     (X_train, y_train), (X_test, y_test)
-
-    X shape : (N, 784)  float32 in [0, 1]
-    y shape : (N, 10)   one-hot encoded
-
-    The full Keras training set (60k) is returned as X_train.
-    Validation split is handled internally by NeuralNetwork.train().
-    Test set is the original Keras test split — never used during training.
     """
     dataset = dataset.lower().replace('-', '_')
 

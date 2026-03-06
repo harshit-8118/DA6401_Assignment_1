@@ -1,7 +1,6 @@
 """
 Inference Script
 Load a saved model and evaluate on the test set.
-CLI is identical to train.py (spec requirement).
 """
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -25,8 +24,7 @@ except ImportError:
 def load_model(model_path):
     """
     Load trained model weights from disk.
-    Returns the weights dict — matches the spec:
-        data = np.load(model_path, allow_pickle=True).item()
+    Returns the weights dict — matches the spec: data = np.load(model_path, allow_pickle=True).item()
     """
     data = np.load(model_path, allow_pickle=True).item()
     return data
@@ -51,14 +49,11 @@ def evaluate_model(model, X_test, y_onehot, batch_size=512):
     y_true_lbl = np.argmax(y_onehot, axis=1)
 
     return {
-        'logits'          : logits,
-        'accuracy'        : accuracy_score(y_true_lbl, y_pred_lbl),
-        'precision'       : precision_score(y_true_lbl, y_pred_lbl,
-                                            average='macro', zero_division=0),
-        'recall'          : recall_score(y_true_lbl, y_pred_lbl,
-                                         average='macro', zero_division=0),
-        'f1'              : f1_score(y_true_lbl, y_pred_lbl,
-                                     average='macro', zero_division=0),
+        'logits' : logits,
+        'accuracy' : accuracy_score(y_true_lbl, y_pred_lbl),
+        'precision' : precision_score(y_true_lbl, y_pred_lbl, average='macro', zero_division=0),
+        'recall' : recall_score(y_true_lbl, y_pred_lbl, average='macro', zero_division=0),
+        'f1' : f1_score(y_true_lbl, y_pred_lbl, average='macro', zero_division=0),
         'confusion_matrix': confusion_matrix(y_true_lbl, y_pred_lbl),
     }
 
@@ -88,8 +83,7 @@ def main():
 
     # Save results
     os.makedirs(args.save_dir, exist_ok=True)
-    out = {k: (v.tolist() if hasattr(v, 'tolist') else v)
-           for k, v in results.items()}
+    out = {k: (v.tolist() if hasattr(v, 'tolist') else v) for k, v in results.items()}
     out_path = os.path.join(args.save_dir, 'inference_results.json')
     with open(out_path, 'w') as f:
         json.dump(out, f, indent=2)
@@ -99,16 +93,16 @@ def main():
     if not args.no_wandb and _WANDB_AVAILABLE:
         run = wandb.init(
             project = args.wandb_project,
-            entity  = args.wandb_entity,
-            name    = 'inference',
-            config  = {'dataset': args.dataset,
+            entity = args.wandb_entity,
+            name = 'inference',
+            config = {'dataset': args.dataset,
                        'model_path': args.model_save_path},
         )
         try:
             run.log({'test/accuracy' : results['accuracy'],
-                     'test/f1'       : results['f1'],
+                     'test/f1' : results['f1'],
                      'test/precision': results['precision'],
-                     'test/recall'   : results['recall']})
+                     'test/recall' : results['recall']})
         except Exception:
             pass
         run.finish()

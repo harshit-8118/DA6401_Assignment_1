@@ -38,7 +38,6 @@ def softmax(z):
 def softmax_derivative(z):
     raise NotImplementedError(
         "softmax_derivative should never be called directly. "
-        "Use the combined CE+softmax gradient: (probs - y) / batch_size"
     )
 
 identity = lambda z: z

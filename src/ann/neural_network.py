@@ -18,14 +18,10 @@ from utils.data_loader import train_val_split, compute_metrics
 class NeuralNetwork:
     """
     Main model class that orchestrates the neural network training and inference.
-
-    Accepts a single cli_args Namespace (matching the argparse definition).
-    No separate config dict is required — optimizer hyper-params (beta, epsilon)
-    are read from cli_args with sensible defaults.
     """
 
     def __init__(self, cli_args):
-        self.cli_args     = cli_args
+        self.cli_args = cli_args
         self.weight_decay = getattr(cli_args, 'weight_decay', 0.0)
 
         self.loss, self.loss_grad = OBJECTIVE[getattr(cli_args, 'loss', 'cross_entropy')]
@@ -47,17 +43,17 @@ class NeuralNetwork:
         opt_name  = cli_args.optimizer
         opt_cls   = OPTIMIZERS[opt_name]
         self.is_nag = (opt_name == 'nag')
-        beta    = getattr(cli_args, 'beta',    0.9)
+        bet = getattr(cli_args, 'beta',    0.9)
         epsilon = getattr(cli_args, 'epsilon', 1e-8)
 
         if opt_name == 'sgd':
             self.optimizer = opt_cls(learning_rate=cli_args.learning_rate)
         elif opt_name in ('momentum', 'nag'):
             self.optimizer = opt_cls(learning_rate=cli_args.learning_rate,
-                                     beta=beta)
+                                     beta=self.cli_args.beta)
         elif opt_name == 'rmsprop':
             self.optimizer = opt_cls(learning_rate=cli_args.learning_rate,
-                                     beta=beta, epsilon=epsilon)
+                                     beta=self.cli_args.beta, epsilon=epsilon)
 
         self.grad_b = None
         self.grad_w = None  
@@ -99,7 +95,6 @@ class NeuralNetwork:
         """
         Backward propagation to compute gradients.
         Returns two numpy arrays: grad_w, grad_b as object arrays.
-        
         grad_w[0] = gradient for output layer weights (shape: hidden_size, 10)
         grad_w[1] = gradient for first hidden layer weights (shape: 784, hidden_size)
         """
@@ -145,15 +140,15 @@ class NeuralNetwork:
     def evaluate(self, X, y_onehot, split_name='val'):
         logits = self.forward(X)
         if self.cli_args.loss == 'mse':
-            loss       = self.loss(y_true=y_onehot, y_pred=logits)
+            loss   = self.loss(y_true=y_onehot, y_pred=logits)
             y_pred_lbl = np.argmax(logits, axis=1)
         else:
-            probs      = ACTIVATIONS['softmax'][0](logits)
-            loss       = self.loss(y_true=y_onehot, y_pred=probs)
+            probs  = ACTIVATIONS['softmax'][0](logits)
+            loss   = self.loss(y_true=y_onehot, y_pred=probs)
             y_pred_lbl = np.argmax(probs, axis=1)
 
-        y_true_lbl      = np.argmax(y_onehot, axis=1)
-        metrics         = compute_metrics(y_true_lbl, y_pred_lbl)
+        y_true_lbl  = np.argmax(y_onehot, axis=1)
+        metrics = compute_metrics(y_true_lbl, y_pred_lbl)
         metrics['loss'] = float(loss)
         return metrics
 
@@ -164,7 +159,7 @@ class NeuralNetwork:
 
         history = {
             'train_loss': [], 'train_acc': [], 'train_f1': [],
-            'val_loss'  : [], 'val_acc'  : [], 'val_f1'  : [],
+            'val_loss' : [], 'val_acc' : [], 'val_f1' : [],
         }
 
         val_fraction = getattr(self.cli_args, 'val_fraction',
@@ -174,14 +169,14 @@ class NeuralNetwork:
         (X_tr, y_tr), (X_val, y_val) = train_val_split(
             X_train, y_train, val_fraction=val_fraction, seed=seed)
 
-        n           = X_tr.shape[0]
+        n   = X_tr.shape[0]
         global_step = 0
 
         print(f"\n  {n} samples | batch={batch_size} | epochs={epochs} | "
               f"opt={self.cli_args.optimizer} | lr={self.cli_args.learning_rate}")
 
         for epoch in range(epochs):
-            idx    = np.random.permutation(n)
+            id = np.random.permutation(n)
             X_shuf = X_tr[idx]
             y_shuf = y_tr[idx]
 
@@ -201,8 +196,8 @@ class NeuralNetwork:
 
             # Per-epoch evaluation
             sample_idx = np.random.choice(n, size=min(5000, n), replace=False)
-            train_m    = self.evaluate(X_tr[sample_idx], y_tr[sample_idx], 'train')
-            val_m      = self.evaluate(X_val, y_val, 'val')
+            train_ = self.evaluate(X_tr[sample_idx], y_tr[sample_idx], 'train')
+            val_m  = self.evaluate(X_val, y_val, 'val')
 
             history['train_loss'].append(train_m['loss'])
             history['train_acc'].append(train_m['accuracy'])
@@ -222,17 +217,17 @@ class NeuralNetwork:
 
             if wandb_run is not None:
                 log_dict = {
-                    'epoch'          : epoch + 1,
-                    'train/loss'     : train_m['loss'],
+                    'epoch' : epoch + 1,
+                    'train/loss' : train_m['loss'],
                     'train/accuracy' : train_m['accuracy'],
                     'train/precision': train_m['precision'],
-                    'train/recall'   : train_m['recall'],
-                    'train/f1'       : train_m['f1'],
-                    'val/loss'       : val_m['loss'],
-                    'val/accuracy'   : val_m['accuracy'],
-                    'val/precision'  : val_m['precision'],
-                    'val/recall'     : val_m['recall'],
-                    'val/f1'         : val_m['f1'],
+                    'train/recall': train_m['recall'],
+                    'train/f1' : train_m['f1'],
+                    'val/loss' : val_m['loss'],
+                    'val/accuracy': val_m['accuracy'],
+                    'val/precision' : val_m['precision'],
+                    'val/recall' : val_m['recall'],
+                    'val/f1': val_m['f1'],
                 }
                 for li, layer in enumerate(self.layers[:-1]):
                     if layer.dead_neuron_counts:
@@ -287,56 +282,55 @@ class NeuralNetwork:
         os.makedirs(save_dir, exist_ok=True)
 
         weights_filename = getattr(self.cli_args, 'model_save_path', 'best_model.npy')
-        weights_path     = os.path.join(save_dir, weights_filename)
+        weights_path = os.path.join(save_dir, weights_filename)
         np.save(weights_path, self.get_weights(), allow_pickle=True)
 
         # Config always saved alongside weights as best_config.json
         config_path = os.path.join(save_dir, 'best_config.json')
         cfg = {
-            'hidden_size'  : list(self.hidden_size),
-            'num_layers'   : len(self.hidden_size),
-            'activation'   : self.cli_args.activation,
-            'weight_init'  : self.cli_args.weight_init,
-            'optimizer'    : self.cli_args.optimizer,
+            'hidden_size' : list(self.hidden_size),
+            'num_layers': len(self.hidden_size),
+            'activation': self.cli_args.activation,
+            'weight_init' : self.cli_args.weight_init,
+            'optimizer' : self.cli_args.optimizer,
             'learning_rate': float(self.cli_args.learning_rate),
             'weight_decay' : float(self.weight_decay),
-            'loss'         : self.cli_args.loss,
-            'epochs'       : int(getattr(self.cli_args, 'epochs', 0)),
-            'best_epoch'   : int(self._best_epoch),
-            'best_val_f1'  : float(self._best_val_f1),
-            'dataset'      : getattr(self.cli_args, 'dataset', 'mnist'),
+            'loss': self.cli_args.loss,
+            'epochs' : int(getattr(self.cli_args, 'epochs', 0)),
+            'best_epoch': int(self._best_epoch),
+            'best_val_f1' : float(self._best_val_f1),
+            'dataset'  : getattr(self.cli_args, 'dataset', 'mnist'),
         }
         with open(config_path, 'w') as f:
             json.dump(cfg, f, indent=2)
 
-        print(f"    Saved {weights_filename}  val_f1={self._best_val_f1:.4f}"
-              f"  epoch={self._best_epoch}")
+        print(f" Saved {weights_filename}  val_f1={self._best_val_f1:.4f}"
+              f" epoch={self._best_epoch}")
 
     @classmethod
     def load(cls, weights_path, config_path):
         """
         Load a saved model.
-        Usage:
-            model = NeuralNetwork.load('best_model.npy', 'best_config.json')
+        Usage: model = NeuralNetwork.load('best_model.npy', 'best_config.json')
         """
         with open(config_path, 'r') as f:
             cfg = json.load(f)
 
         hidden_size = cfg.get('hidden_size', [128, 128, 64])
         cli_args = argparse.Namespace(
-            hidden_size     = hidden_size,
-            num_layers      = cfg.get('num_layers', len(hidden_size)),
-            activation      = cfg['activation'],
-            weight_init     = cfg['weight_init'],
-            optimizer       = cfg['optimizer'],
+            hidden_size = hidden_size,
+            num_layers  = cfg.get('num_layers', len(hidden_size)),
+            activation  = cfg['activation'],
+            weight_init = cfg['weight_init'],
+            optimizer   = cfg['optimizer'],
             learning_rate   = cfg['learning_rate'],
-            weight_decay    = cfg.get('weight_decay', 0.0),
-            loss            = cfg['loss'],
-            epochs          = cfg.get('epochs', 0),
-            dataset         = cfg.get('dataset', 'mnist'),
+            weight_deca = cfg.get('weight_decay', 0.0),
+            loss = cfg['loss'],
+            epochs = cfg.get('epochs', 0),
+            dataset = cfg.get('dataset', 'mnist'),
             model_save_path = os.path.basename(weights_path),
-            beta            = 0.9,
-            epsilon         = 1e-8,
+            beta = 0.9,
+            epsilon = 1e-8,
         )
 
         model = cls(cli_args)
@@ -348,7 +342,7 @@ class NeuralNetwork:
         print(f"Model loaded from '{weights_path}'")
         print(f"  Architecture : 784  "
               f"{'  '.join(str(n) for n in hidden_size)}  10")
-        print(f"  Best val F1  : {cfg.get('best_val_f1', 'N/A')}  "
+        print(f"  Best val F1 : {cfg.get('best_val_f1', 'N/A')}  "
               f"(epoch {cfg.get('best_epoch', 'N/A')})")
         return model
 
