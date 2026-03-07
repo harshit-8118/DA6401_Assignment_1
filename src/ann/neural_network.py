@@ -176,7 +176,7 @@ class NeuralNetwork:
               f"opt={self.cli_args.optimizer} | lr={self.cli_args.learning_rate}")
 
         for epoch in range(epochs):
-            id = np.random.permutation(n)
+            idx = np.random.permutation(n)
             X_shuf = X_tr[idx]
             y_shuf = y_tr[idx]
 
@@ -196,7 +196,7 @@ class NeuralNetwork:
 
             # Per-epoch evaluation
             sample_idx = np.random.choice(n, size=min(5000, n), replace=False)
-            train_ = self.evaluate(X_tr[sample_idx], y_tr[sample_idx], 'train')
+            train_m = self.evaluate(X_tr[sample_idx], y_tr[sample_idx], 'train')
             val_m  = self.evaluate(X_val, y_val, 'val')
 
             history['train_loss'].append(train_m['loss'])
